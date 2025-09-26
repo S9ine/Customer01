@@ -1,0 +1,406 @@
+<datalist id="vehicle-options"></datalist>
+<datalist id="maintenance-type-options"></datalist>
+<datalist id="product-options"></datalist>
+<datalist id="branch-options"></datalist>
+<datalist id="employee-options"></datalist>
+<datalist id="supplier-options"></datalist>
+
+<div class="modal fade" id="withdrawalModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header modal-header-withdrawal">
+                <h5 class="modal-title" id="withdrawalModalLabel"><i class="bi bi-box-arrow-up me-2"></i>ฟอร์มเบิกสินค้า</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="withdrawalForm" novalidate>
+                    <input type="hidden" id="wd-docId">
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">ชื่อผู้เบิก</label>
+                            <input class="form-control" list="employee-options" id="wd-requester" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">สาขา</label>
+                            <div class="input-group">
+                                <input class="form-control" list="branch-options" id="wd-department">
+                                <button class="btn btn-outline-primary" type="button" onclick="openNewContactModal()" title="เพิ่มผู้ติดต่อใหม่">
+                                    <i class="bi bi-person-plus-fill"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-top">
+                        <h6><i class="bi bi-stack me-1"></i> จัดการแผงไข่ (ถ้ามี)</h6>
+                        <div class="p-3 rounded bg-light">
+                            <div class="row g-3 align-items-center">
+                                <div class="col-md-6">
+                                    <label class="form-label">ยอดคงค้างของสาขา:</label>
+                                    <div id="wd-current-tray-balance" class="fs-4 fw-bold text-danger">เลือกสาขา...</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">จำนวนแผงที่ส่งไปด้วย</label>
+                                    <input type="number" class="form-control" id="wd-tray-sent" placeholder="กรอกจำนวน">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="mt-4">รายการสินค้า</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>ชื่อสินค้า</th>
+                                    <th>จำนวน</th>
+                                    <th>หน่วย</th>
+                                    <th>หมายเหตุ</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="withdrawalItemTableBody"></tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addWithdrawalItemRow()"><i class="bi bi-plus"></i> เพิ่มรายการ</button>
+                    <hr>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">ผู้อนุมัติ</label>
+                            <input class="form-control" list="employee-options" id="wd-approver" required>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" id="wd-submit-btn" form="withdrawalForm" class="btn btn-primary">บันทึกข้อมูล</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="receiptModal" tabindex="-1" aria-labelledby="receiptModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header modal-header-receipt">
+                <h5 class="modal-title" id="receiptModalLabel"><i class="bi bi-box-arrow-in-down me-2"></i>ฟอร์มรับสินค้า</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="receiptForm">
+                    <input type="hidden" id="rc-docId">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">ชื่อซัพพลายเออร์</label>
+                            <div class="input-group">
+                                <input class="form-control" list="supplier-options" id="rc-supplier" required>
+                                <button class="btn btn-outline-success" type="button" onclick="openNewContactModal()" title="เพิ่มผู้ติดต่อใหม่"><i class="bi bi-person-plus-fill"></i></button>
+                            </div>
+                        </div>
+                        <div class="col-md-6"><label class="form-label">เบอร์ติดต่อ</label><input type="tel" class="form-control" id="rc-tel" readonly></div>
+                    </div>
+<div class="pt-3 border-top">
+    <h6><i class="bi bi-stack me-1"></i> จัดการแผงไข่</h6>
+    <div class="p-3 rounded bg-light">
+        <div class="row g-3 align-items-center">
+            <div class="col-md-4">
+                <label class="form-label">ยอดคงค้างปัจจุบัน:</label>
+                <div id="rc-current-tray-balance" class="fs-4 fw-bold text-danger">เลือกซัพพลายเออร์...</div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">จำนวนแผงที่รับมา</label>
+                <input type="number" class="form-control" id="rc-tray-received" placeholder="กรอกจำนวน">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">จำนวนแผงที่คืน</label>
+                <input type="number" class="form-control" id="rc-tray-returned" placeholder="กรอกจำนวน">
+            </div>
+        </div>
+    </div>
+</div>
+                    <h6>รายการสินค้า</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead><tr><th>ชื่อสินค้า</th><th>จำนวน</th><th>หน่วย</th><th>น้ำหนัก (กก.)</th><th>หมายเหตุ</th><th></th></tr></thead>
+                            <tbody id="receiptItemTableBody"></tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addReceiptItemRow()"><i class="bi bi-plus"></i> เพิ่มรายการ</button>
+                    <hr>
+                    <div class="row g-3"><div class="col-md-6"><label class="form-label">ชื่อผู้รับสินค้า</label><input class="form-control" list="employee-options" id="rc-receiver" required></div></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" id="rc-submit-btn" form="receiptForm" class="btn btn-success">บันทึกข้อมูล</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="sortingModal" tabindex="-1" aria-labelledby="sortingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header modal-header-sorting">
+                <h5 class="modal-title" id="sortingModalLabel"><i class="bi bi-columns-gap me-2"></i>ฟอร์มคัดแยกสินค้า</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+<div class="modal-body">
+    <form id="sortingForm">
+        <input type="hidden" id="sort-docId">
+        <h6>ข้อมูลอ้างอิง</h6>
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" id="sort-refDocId" placeholder="กรอกเลข GRN เพื่อดึงข้อมูล...">
+            <button class="btn btn-outline-secondary" type="button" id="fetch-btn" onclick="fetchDataForSorting()">ดึงข้อมูล</button>
+        </div>
+
+        <div id="item-selection-area" class="mb-3"></div>
+
+        <div id="source-info" class="p-3 rounded bg-light mb-3" style="display:none;">
+            <div class="row g-3">
+                <div class="col-md-8"><label class="form-label">สินค้าต้นทาง</label><input type="text" class="form-control" id="sort-sourceItem" readonly></div>
+                <div class="col-md-4"><label class="form-label">จำนวนต้นทาง</label><input type="number" class="form-control" id="sort-sourceQty" readonly></div>
+            </div>
+        </div>
+
+        <h6 class="mt-4">รายการคัดแยก (ผลลัพธ์)</h6>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>สินค้าที่ได้</th><th>จำนวน</th><th>หน่วย</th><th></th></tr></thead>
+                <tbody id="sortingItemTableBody"></tbody>
+            </table>
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addSortingItemRow()"><i class="bi bi-plus"></i> เพิ่มรายการ</button>
+
+    </form>
+</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" id="sort-submit-btn" class="btn btn-sorting" form="sortingForm">บันทึกการคัดแยก</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="maintenanceModal" tabindex="-1" aria-labelledby="maintenanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header modal-header-maintenance">
+                <h5 class="modal-title" id="maintenanceModalLabel"><i class="bi bi-tools me-2"></i>ฟอร์มบันทึกการซ่อมบำรุง</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="maintenanceForm">
+                    <input type="hidden" id="ma-docId">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4"><label class="form-label">วันที่ซ่อม</label><input type="date" class="form-control" id="ma-date" required></div>
+                        <div class="col-md-4"><label class="form-label">ทะเบียนรถ</label><input class="form-control" id="ma-vehicleId" list="vehicle-options" required></div>
+                        <div class="col-md-4"><label class="form-label">เลขไมล์ (กม.)</label><input type="number" class="form-control" id="ma-mileage" required></div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6"><label class="form-label">ประเภทการซ่อม</label><input class="form-control" id="ma-type" list="maintenance-type-options" placeholder="เช่น เปลี่ยนน้ำมันเครื่อง..."></div>
+                        <div class="col-md-6"><label class="form-label">ค่าใช้จ่าย (บาท)</label><input type="number" step="0.01" class="form-control" id="ma-cost" required></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label">รายละเอียดการซ่อม/อะไหล่</label><textarea class="form-control" id="ma-details" rows="3"></textarea></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" id="ma-submit-btn" class="btn btn-primary" form="maintenanceForm">บันทึกข้อมูล</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="random-check-modal" tabindex="-1" aria-labelledby="randomCheckModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <form id="randomCheckForm">
+                <div class="modal-header modal-header-check">
+                    <h5 class="modal-title" id="randomCheckModalLabel"><i class="bi bi-clipboard2-check-fill me-2"></i>สุ่มเช็คคุณภาพสินค้า</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="check-id">
+                    <input type="hidden" id="check-refDocId">
+                    <div class="mb-3"><label class="form-label">เอกสารรับเข้า</label><input type="text" id="check-refDocId-display" class="form-control" readonly></div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered table-striped table-hover" id="random-check-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 28%;">รายการสินค้า</th>
+                                    <th style="width: 15%;">จำนวนจริง</th>
+                                    <th style="width: 15%;">น้ำหนักจริง</th>
+                                    <th style="width: 20%;">ผลการตรวจ</th>
+                                    <th>หมายเหตุ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="check-items-table-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="mb-3 mt-3"><label class="form-label fw-bold">ชื่อผู้สุ่มนับ</label><input class="form-control" list="employee-options" id="check-checkerName" required></div>
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <button type="button" id="check-delete-btn" class="btn btn-outline-danger" onclick="handleDeleteCheck()" style="display: none;">ลบข้อมูล</button>
+                    <div>
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+                        <button type="submit" id="check-submit-btn" class="btn btn-success">บันทึกผล</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="receipt-details-modal" tabindex="-1" aria-labelledby="receiptDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="receipt-details-title">รายละเอียดสินค้า</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered details-table">
+                        <thead class="table-light"><tr><th>ชื่อสินค้า</th><th class="text-end">จำนวน</th><th class="text-center">หน่วย</th><th class="text-end">น้ำหนัก (kg)</th><th>หมายเหตุ</th></tr></thead>
+                        <tbody id="receipt-details-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="new-contact-modal" tabindex="-1" aria-labelledby="newContactModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="newContactModalLabel"><i class="bi bi-person-plus-fill me-2"></i>เพิ่มผู้ติดต่อใหม่</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+<form id="newContactForm">
+    <div class="mb-3">
+        <label class="form-label">ประเภทผู้ติดต่อ</label>
+        <select class="form-select" id="new-contact-type" required>
+            <option value="" selected disabled>-- กรุณาเลือก --</option>
+            <option value="Supplier">ซัพพลายเออร์</option>
+            <option value="Branch">สาขา</option>
+        </select>
+    </div>
+
+    <div class="mb-3" id="branch-id-group" style="display: none;">
+        <label class="form-label">รหัสสาขา</label>
+        <input type="text" id="new-contact-id" class="form-control" placeholder="กรอกรหัสสาขาเอง เช่น BKK, CNX">
+    </div>
+    
+    <div class="mb-3"> <label class="form-label">ชื่อ</label>
+        <input type="text" id="new-contact-name" class="form-control" required>
+    </div>
+    <div class="mb-3"> <label class="form-label">เบอร์ติดต่อ</label>
+        <input type="tel" id="new-contact-tel" class="form-control">
+    </div>
+</form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary" form="newContactForm">บันทึก</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="returnTrayModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #dc3545; color: white;">
+                <h5 class="modal-title">ฟอร์มคืนแผงไข่</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="returnTrayForm">
+        <div class="mb-3">
+            <label for="return-contact" class="form-label">เลือกซัพพลายเออร์ / สาขา</label>
+            <input class="form-control" list="return-contact-options" id="return-contact" placeholder="พิมพ์เพื่อค้นหา..." required>
+            <datalist id="return-contact-options"></datalist>
+        </div>
+                    <div class="mb-3">
+                        <label class="form-label">จำนวนแผงที่คืน</label>
+                        <input type="number" class="form-control" id="return-tray-quantity" min="1" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" class="btn btn-danger" form="returnTrayForm">ยืนยันการคืน</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addProductModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="bi bi-box-seam-fill me-2"></i>ฟอร์มเพิ่มสินค้าใหม่</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addProductForm">
+          <div class="mb-3">
+            <label class="form-label">รหัสสินค้า (SKU)</label>
+            <input type="text" id="new-product-code" class="form-control" placeholder="เช่น EGG-01, PORK-A" required>
+            <div class="form-text">*ห้ามซ้ำกับรหัสที่มีอยู่แล้ว</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">ชื่อสินค้า</label>
+            <input type="text" id="new-product-name" class="form-control" placeholder="เช่น ไข่ไก่เบอร์ 0 (แผง)" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">หมวดหมู่</label>
+            <input type="text" id="new-product-category" class="form-control" placeholder="เช่น ไข่ไก่สด, สินค้าแปรรูป" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+        <button type="submit" class="btn btn-primary" form="addProductForm">บันทึกสินค้า</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editProductModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title"><i class="bi bi-pencil-fill me-2"></i>แก้ไขข้อมูลสินค้า</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editProductForm">
+          <div class="mb-3">
+            <label class="form-label">รหัสสินค้า (SKU)</label>
+            <input type="text" id="edit-product-code" class="form-control" readonly>
+            <div class="form-text">*รหัสสินค้าไม่สามารถแก้ไขได้</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">ชื่อสินค้า</label>
+            <input type="text" id="edit-product-name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">หมวดหมู่</label>
+            <input type="text" id="edit-product-category" class="form-control" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+        <button type="submit" class="btn btn-warning" form="editProductForm">บันทึกการเปลี่ยนแปลง</button>
+      </div>
+    </div>
+  </div>
+</div>
