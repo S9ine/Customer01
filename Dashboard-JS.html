@@ -1,0 +1,140 @@
+<script>
+    let settingsModal;
+
+    window.addEventListener("pageshow", function(event) {
+        // ตรวจสอบว่าหน้านี้ถูกโหลดมาจาก Back-forward cache หรือไม่
+        if (event.persisted) {
+            // ถ้าใช่ (ผู้ใช้กดย้อนกลับมา) ให้สั่งโหลดข้อมูลใหม่
+            console.log("Page was loaded from bfcache. Re-initializing...");
+            showLoader();
+            google.script.run
+                .withSuccessHandler(updateStatCards)
+                .withFailureHandler(showError)
+                .getDashboardStats();
+        }
+    });
+
+    document.addEventListener("DOMContentLoaded", function() {
+        showLoader();
+        displayCurrentDate();
+
+        google.script.run
+            .withSuccessHandler(updateStatCards)
+            .withFailureHandler(showError)
+            .getDashboardStats();
+
+        settingsModal = new bootstrap.Modal(document.getElementById('settings-modal'));
+        document.getElementById('settings-form').addEventListener('submit', handleSettingsSubmit);
+
+        const featureCards = document.querySelectorAll('.feature-card');
+    featureCards.forEach((card, index) => {
+        card.style.animationDelay = `${index * 0.1}s`;
+    });
+    });
+
+    function showLoader() { 
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.style.display = 'flex'; 
+    }
+    function hideLoader() { 
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.style.display = 'none'; 
+    }
+
+    function updateStatCards(stats) {
+        if (stats.error) { showError({ message: stats.error }); return; }
+        document.getElementById("total-products").textContent = (stats.totalProducts || 0).toLocaleString('en-US');
+        document.getElementById("low-stock").textContent = (stats.lowStockCount || 0).toLocaleString('en-US');
+        document.getElementById("out-of-stock").textContent = (stats.outOfStockCount || 0).toLocaleString('en-US');
+        hideLoader();
+    }
+
+    function showError(error) {
+        console.error("Error from server or script:", error);
+        document.getElementById("total-products").textContent = "Error";
+        document.getElementById("low-stock").textContent = "Error";
+        document.getElementById("out-of-stock").textContent = "Error";
+        hideLoader();
+    }
+    
+    function openSettings() {
+        showLoader();
+        google.script.run.withSuccessHandler(settings => {
+            document.getElementById("setting-companyName").value = settings.companyName || "";
+            document.getElementById("setting-address1").value = settings.address1 || "";
+            document.getElementById("setting-address2").value = settings.address2 || "";
+            document.getElementById("setting-contactInfo").value = settings.contactInfo || "";
+            document.getElementById("setting-low-stock").value = settings.lowStockThreshold || 10;
+            settingsModal.show();
+            hideLoader();
+        }).withFailureHandler(err => {
+            hideLoader();
+            showError(err);
+        }).getAppSettings();
+    }
+
+    function handleSettingsSubmit(e) {
+        e.preventDefault();
+        showLoader();
+        const submitBtn = document.querySelector('#settings-modal button[type="submit"]');
+        submitBtn.disabled = true;
+
+        const settingsData = {
+            companyName: document.getElementById("setting-companyName").value,
+            address1: document.getElementById("setting-address1").value,
+            address2: document.getElementById("setting-address2").value,
+            contactInfo: document.getElementById("setting-contactInfo").value,
+            lowStockThreshold: document.getElementById("setting-low-stock").value
+        };
+
+        google.script.run.withSuccessHandler(res => {
+            hideLoader();
+            if(res.success) {
+               alert("บันทึกการตั้งค่าทั้งหมดสำเร็จ!");
+               settingsModal.hide();
+            } else {
+               alert(`เกิดข้อผิดพลาด: ${res.message}`);
+            }
+            submitBtn.disabled = false;
+        }).withFailureHandler(err => {
+            hideLoader();
+            submitBtn.disabled = false;
+            showError(err);
+        }).saveAppSettings(settingsData);
+    }
+    
+    function handleClearCache() {
+        if (confirm('ต้องการล้างแคชและโหลดข้อมูล Dropdown ใหม่ทั้งหมดหรือไม่?')) {
+            showLoader();
+            google.script.run.withSuccessHandler(res => {
+                hideLoader();
+                if (res.success) {
+                    alert('ล้างแคชฝั่งเซิร์ฟเวอร์สำเร็จ!');
+                } else {
+                    alert(`เกิดข้อผิดพลาด: ${res.message}`);
+                }
+            }).withFailureHandler(err => {
+                hideLoader();
+                showError(err);
+            }).clearServerCache();
+        }
+    }
+
+function displayCurrentDate() {
+    const dateElement = document.getElementById("dashboard-date");
+    if (!dateElement) return;
+
+    const today = new Date();
+    // Options สำหรับการแปลงวันที่เป็นรูปแบบภาษาไทยเต็ม (เช่น วันศุกร์ที่ 26 กันยายน พ.ศ. 2568)
+    const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        era: 'short' // เพิ่ม era เพื่อให้แสดงเป็น พ.ศ.
+    };
+    
+    // ใช้ toLocaleDateString เพื่อแปลงเป็นภาษาไทยและปฏิทินพุทธ
+    dateElement.textContent = `ข้อมูล ณ ${today.toLocaleDateString('th-TH-u-ca-buddhist', options)}`;
+}
+</script>
