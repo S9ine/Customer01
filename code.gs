@@ -34,23 +34,28 @@ const CONFIG = {
 // === 2. ฟังก์ชันหลักสำหรับ Web App (Entry & Shared) ===
 // ===================================================
 function doGet(e) {
+  // 1. ตรวจสอบสิทธิ์ผู้ใช้งานก่อน
   if (checkUserAccess_()) {
+
+    // 2. ตรวจสอบว่าผู้ใช้ต้องการไปหน้าทำงานหลักหรือไม่
     if (e.parameter.page) {
       const template = HtmlService.createTemplateFromFile('WebApp');
       template.initialPage = e.parameter.page;
-      // [แก้] เพิ่มบรรทัดนี้เพื่อส่ง URL ของ Dashboard ไปด้วย
       template.dashboardUrl = ScriptApp.getService().getUrl(); 
       
       return template.evaluate()
-        .setTitle("ระบบจัดการสต็อก")
+        .setTitle("ระบบจัดการสต็อก") // ตั้งชื่อบนแท็บ
         .setSandboxMode(HtmlService.SandboxMode.IFRAME);
 
+    // 3. ถ้าไม่ใช่ ให้ไปที่หน้า Dashboard
     } else {
       return HtmlService.createTemplateFromFile('Dashboard')  
         .evaluate()
-        .setTitle("Dashboard | ระบบจัดการสต็อก")
+        .setTitle("Dashboard | ระบบจัดการสต็อก") // ตั้งชื่อบนแท็บ
         .setSandboxMode(HtmlService.SandboxMode.IFRAME);
     }
+    
+  // 4. ถ้าไม่มีสิทธิ์ ให้แสดงหน้า Access Denied
   } else {
     return HtmlService.createHtmlOutputFromFile('AccessDenied')
       .setTitle("Access Denied")
