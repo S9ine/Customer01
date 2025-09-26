@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
+    <?!= include('Style'); ?>
+</head>
+<body>
+
+<div class="main-container">
+    <header class="page-header">
+        <h1 class="display-6">ระบบจัดการสต็อก</h1>
+        <p class="lead text-muted">ภาพรวมและเครื่องมือสำหรับจัดการคลังสินค้า</p>
+    </header>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top shadow-sm rounded mb-4 border">
+  <div class="container-fluid">
+    
+    <div class="d-flex">
+      <button class="btn btn-outline-secondary btn-sm" onclick="openSettings()">
+        <i class="bi bi-gear-fill"></i>
+      </button>
+    </div>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="mainNavbar">
+      <ul class="navbar-nav ms-auto mb-2 mb-lg-0" id="mainNavLinks">
+        <li class="nav-item"><a class="nav-link active" data-tab="stock"><i class="bi bi-bar-chart-fill me-1"></i> คลังสินค้า</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="receipt"><i class="bi bi-box-arrow-in-down me-1"></i> รับสินค้า</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="sorting"><i class="bi bi-columns-gap me-1"></i> คัดแยกสินค้า</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="withdrawal"><i class="bi bi-box-arrow-up me-1"></i> เบิกสินค้า</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="suppliers"><i class="bi bi-people-fill me-1"></i> ยอดค้างแผง</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="check-history"><i class="bi bi-clipboard2-check-fill me-1"></i> ประวัติสุ่มเช็ค</a></li>
+        <li class="nav-item"><a class="nav-link" data-tab="maintenance"><i class="bi bi-tools me-1"></i> ซ่อมบำรุง</a></li>
+      </ul>
+    </div>
+
+  </div>
+</nav>
+
+    <main class="tab-content-area mt-4">
+
+        <div id="stock-section" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="card-title mb-0">ภาพรวมคลังสินค้า</h5>
+                        <div class="card-header-actions d-flex align-items-center gap-2">  
+                          <input type="search" class="form-control me-2" id="product-management-search" placeholder="ค้นหา...">              
+                            <button class="btn btn-light text-nowrap" onclick="printStock()"><i class="bi bi-printer me-1"></i> พิมพ์</button>
+                            <button class="btn btn-light text-nowrap" onclick="openAddProductModal()"><i class="bi bi-plus-circle"></i> เพิ่มสินค้า
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+<table class="table table-striped table-hover" id="product-management-table">
+    <thead> </thead>
+    <tbody id="product-management-table-body"></tbody>
+</table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<div id="suppliers-section" class="tab-content">
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="card-title mb-0">ยอดแผงคงค้าง</h5>
+                
+                <div class="card-header-actions d-flex align-items-center gap-2">
+                    <input type="text" id="supplier-search" class="form-control form-control-sm" placeholder="ค้นหา ID, ชื่อ, ประเภท...">
+                    <button class="btn btn-light btn-sm" onclick="openReturnTrayModal()">คืนแผงไข่</button>
+                </div>
+                </div>
+        </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>รหัส</th>
+                                <th>ชื่อผู้ติดต่อ</th>
+                                <th class="text-center">ประเภท</th>
+                                <th>เบอร์ติดต่อ</th>
+                                <th class="text-end">ยอดแผงคงค้าง</th>
+                            </tr>
+                        </thead>
+                        <tbody id="supplierTableBody">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+        
+        <div id="withdrawal-section" class="tab-content">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="card-title mb-0">ประวัติการเบิก</h5>
+                        <div class="card-header-actions d-flex align-items-center gap-2">
+                            <input type="text" id="withdrawal-search" class="form-control form-control-sm" placeholder="ค้นหา...">
+                            <button class="btn btn-primary btn-sm" onclick="openWithdrawalModal()"><i class="bi bi-plus-circle me-1"></i> สร้างใบเบิก</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>เลขเอกสาร</th>
+                                    <th>วันที่</th>
+                                    <th>ผู้เบิก</th>
+                                    <th>ผู้อนุมัติ</th>
+                                    <th>รายการ</th>
+                                    <th class="text-end">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="withdrawalHistoryTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-white"><nav><ul class="pagination justify-content-center" id="withdrawal-pagination"></ul></nav></div>
+            </div>
+        </div>
+
+        <div id="receipt-section" class="tab-content">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="card-title mb-0">ประวัติการรับสินค้า</h5>
+                        <div class="card-header-actions d-flex align-items-center gap-2">
+                            <input type="text" id="receipt-search" class="form-control form-control-sm" placeholder="ค้นหา...">
+                            <button class="btn btn-success btn-sm" onclick="openReceiptModal()"><i class="bi bi-plus-circle me-1"></i> สร้างใบรับ</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                     <div class="table-responsive">
+                        <table class="table table-striped table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>เลขเอกสาร</th>
+                                    <th>วันที่</th>
+                                    <th>ซัพพลายเออร์</th>
+                                    <th>ผู้รับ</th>
+                                    <th>รายการ</th>
+                                    <th class="text-end">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="receiptHistoryTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-white"><nav><ul class="pagination justify-content-center" id="receipt-pagination"></ul></nav></div>
+            </div>
+        </div>
+
+        <div id="sorting-section" class="tab-content">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="card-title mb-0">ประวัติการคัดแยก</h5>
+                        <div class="card-header-actions d-flex align-items-center gap-2">
+                           <input type="text" id="sorting-search" class="form-control form-control-sm" placeholder="ค้นหา...">
+                           <button class="btn btn-sorting btn-sm" onclick="openSortingModal()"><i class="bi bi-plus-circle me-1"></i> สร้างใบคัดแยก</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>เลขเอกสาร</th>
+                                    <th>วันที่</th>
+                                    <th>อ้างอิง GRN</th>
+                                    <th>รายละเอียด</th>
+                                    <th class="text-end">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sortingHistoryTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-white"><nav><ul class="pagination justify-content-center" id="sorting-pagination"></ul></nav></div>
+            </div>
+        </div>
+
+        <div id="check-history-section" class="tab-content">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="card-title mb-0">ประวัติการสุ่มเช็ค</h5>
+                        <div class="card-header-actions"> 
+                           <input type="text" id="check-history-search" class="form-control form-control-sm" placeholder="ค้นหา...">                   
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID การเช็ค</th>
+                                    <th>วันที่</th>
+                                    <th>เอกสารอ้างอิง</th>
+                                    <th>รายการ</th>
+                                    <th>ผล</th>
+                                    <th>ผู้ตรวจ</th>
+                                    <th class="text-end">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="checkHistoryTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-white"><nav><ul class="pagination justify-content-center" id="check-history-pagination"></ul></nav></div>
+            </div>
+        </div>
+
+        <div id="maintenance-section" class="tab-content">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="card-title mb-0">ประวัติการซ่อมบำรุง</h5>
+                        <div class="card-header-actions d-flex align-items-center gap-2">
+                            <input type="text" id="maintenance-search" class="form-control form-control-sm" placeholder="ค้นหาทะเบียนรถ...">
+                            <button class="btn btn-primary btn-sm" onclick="openMaintenanceModal()"><i class="bi bi-plus-circle me-1"></i> บันทึกการซ่อม</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>เลขเอกสาร</th>
+                                    <th>วันที่</th>
+                                    <th>ทะเบียนรถ</th>
+                                    <th>เลขไมล์</th>
+                                    <th>ประเภท</th>
+                                    <th>รายละเอียด</th>
+                                    <th class="text-end">ค่าใช้จ่าย</th>
+                                    <th class="text-end">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="maintenanceHistoryTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-white"><nav><ul class="pagination justify-content-center" id="maintenance-pagination"></ul></nav></div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<?!= include('Modals'); ?>
+
+
+<div id="toast-container"></div>
+<div id="loading-overlay" style="display: none;">
+<div class="egg-loader">
+        <div class="egg"></div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  const initialPage = <?= initialPage || '"stock"' ?>;
+  const dashboardUrl = <?= dashboardUrl || '""' ?>;
+</script>
+<?!= include('JavaScript'); ?>
+
+</body>
+</html>
