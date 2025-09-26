@@ -1,0 +1,342 @@
+<style>
+/* =================================================== */
+/* === 1. การตั้งค่าตัวแปรหลัก (Theme & Variables) ==== */
+/* =================================================== */
+:root {
+    --font-family-sans-serif: 'Sarabun', sans-serif;
+    --bs-body-font-family: var(--font-family-sans-serif);
+    --primary-color: #0d6efd;
+    --success-color: #198754;
+    --sorting-color: #6f42c1;
+    --light-gray: #f8f9fa;
+    --border-color: #dee2e6;
+    --card-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+/* =================================================== */
+/* === [NEW] Style for Themed Header Controls ====== */
+/* =================================================== */
+.module-header-sticky .form-control {
+    background-color: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: white;
+}
+.module-header-sticky .form-control::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+}
+.module-header-sticky .btn-primary,
+.module-header-sticky .btn-success {
+    background-color: white;
+    border-color: white;
+    color: #333; /* สีตัวอักษรบนปุ่ม */
+}
+.module-header-sticky .btn-primary:hover,
+.module-header-sticky .btn-success:hover {
+    background-color: #f0f0f0;
+    border-color: #f0f0f0;
+}
+
+/* =================================================== */
+/* === 2. โครงสร้างและ Layout หลัก (Mobile First) ====== */
+/* =================================================== */
+body {
+    background-color: var(--light-gray);
+    font-size: 15px; /* ลดขนาด font เริ่มต้นสำหรับมือถือ */
+}
+
+.main-container {
+    width: 100%;
+    padding: 0.75rem; /* ลด padding สำหรับมือถือ */
+}
+
+.page-header h1 {
+    font-size: 1.75rem; /* ลดขนาดหัวข้อใหญ่บนมือถือ */
+}
+.page-header {
+    text-align: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+
+/* =================================================== */
+/* === 3. Navigation Tabs (Scrollable on Mobile) ===== */
+/* =================================================== */
+.nav-wrapper {
+    background-color: white;
+    padding: 0.25rem 0; /* ปรับ padding */
+    border-radius: 0.375rem;
+    border: 1px solid var(--border-color);
+    z-index: 1020;
+}
+
+.nav-tabs {
+    border-bottom: none;
+    align-items: center;
+    /* ทำให้ Tabs เลื่อนแนวนอนได้บนมือถือ */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* ทำให้เลื่อนลื่นบน iOS */
+    scrollbar-width: none; /* ซ่อน scrollbar - Firefox */
+    -ms-overflow-style: none; /* ซ่อน scrollbar - IE/Edge */
+}
+.nav-tabs::-webkit-scrollbar {
+    display: none; /* ซ่อน scrollbar - Chrome/Safari */
+}
+
+.nav-tabs .nav-item {
+    flex-shrink: 0; /* ป้องกันไม่ให้ item หดตัว */
+}
+
+.nav-tabs .nav-link {
+    color: #6c757d;
+    font-weight: 500;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 0.75rem 1rem; /* ปรับขนาด padding ของปุ่มเมนู */
+    white-space: nowrap; /* ไม่ให้ข้อความในปุ่มตัดบรรทัด */
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+.nav-tabs .nav-link:hover, .nav-tabs .nav-link:focus {
+    border-color: var(--border-color);
+    color: #212529;
+}
+.nav-tabs .nav-link.active {
+    color: var(--primary-color);
+    background-color: transparent;
+    border-color: var(--primary-color);
+    font-weight: 700;
+}
+
+.nav-item-settings {
+    padding: 0 1rem; /* เพิ่ม padding ให้ปุ่มตั้งค่า */
+}
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* =================================================== */
+/* === 4. Cards & Tables (Mobile First) ============== */
+/* =================================================== */
+.card {
+    border: none;
+    border-radius: 0.5rem;
+}
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 1rem;
+}
+.card-title {
+    font-weight: 700;
+    color: #343a40;
+}
+/* จัดการส่วน Actions ของ Card Header สำหรับมือถือ */
+.card-header-actions {
+    width: 100%;
+}
+.card-header-actions .form-control {
+    flex-grow: 1; /* ทำให้ช่องค้นหาขยายเต็มพื้นที่ที่เหลือ */
+}
+
+.table {
+    vertical-align: middle;
+}
+.table thead th {
+    background-color: #f8f9fa;
+    border-bottom-width: 1px;
+    font-weight: 500;
+    color: #495057;
+}
+/* ลด Padding ของตารางบนมือถือ */
+.table td, .table th {
+    padding: 0.75rem;
+}
+.card-body.p-0 .table {
+    margin-bottom: 0;
+}
+
+.card-footer {
+    border-top: 1px solid #f0f0f0;
+}
+.pagination { 
+    margin-bottom: 0; 
+}
+
+
+/* =================================================== */
+/* === 5. Styles สำหรับหน้าจอ PC (Desktop Styles) ===== */
+/* === ใช้ Media Query ที่ 768px ขึ้นไป (Tablet/PC) === */
+/* =================================================== */
+@media (min-width: 768px) {
+    body {
+        font-size: 16px; /* คืนขนาด font สำหรับ PC */
+    }
+
+    .main-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1.5rem; /* เพิ่ม padding สำหรับ PC */
+    }
+
+    .page-header h1 {
+        font-size: 2.5rem; /* คืนขนาดหัวข้อใหญ่ */
+    }
+
+    .nav-wrapper {
+        padding: 0.5rem 1rem;
+    }
+
+    .nav-tabs {
+        flex-wrap: wrap; /* ทำให้เมนูตัดบรรทัดได้ถ้าจำเป็นบนจอใหญ่ */
+        overflow-x: hidden; /* ไม่ต้อง scroll บน PC */
+    }
+
+    /* คืนค่า Layout ของ Card Header สำหรับ PC */
+    .card-header-actions {
+        width: auto;
+    }
+    .card-header-actions .form-control-sm {
+        width: 250px; /* กำหนดความกว้างช่องค้นหาบน PC */
+    }
+    .card-header-actions .form-control {
+        flex-grow: 0;
+    }
+
+    /* คืนค่า Padding ของตารางบน PC */
+    .table td, .table th {
+        padding: 0.9rem;
+    }
+}
+
+
+/* =================================================== */
+/* === 6. ส่วนที่เหลือ (Modals, Loading, etc.) ========= */
+/* =================================================== */
+.modal-header-withdrawal,
+.modal-header-receipt,
+.modal-header-sorting,
+.modal-header-maintenance,
+.modal-header-check {
+ color: white;
+}
+.modal-header .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+.modal-header-withdrawal { background-color: var(--primary-color); }
+.modal-header-receipt   { background-color: var(--success-color); }
+.modal-header-sorting   { background-color: var(--sorting-color); }
+.modal-header-maintenance{ background-color: var(--primary-color); }
+.modal-header-check     { background-color: var(--success-color); }
+.btn-sorting { background-color: var(--sorting-color); color: white; }
+.btn-sorting:hover { background-color: #5a2ea4; color: white; }
+#random-check-table .form-control, #random-check-table .form-select { font-size: 0.875rem; }
+.details-table th, .details-table td { vertical-align: middle; }
+
+#toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 250px; }
+.toast-notification { background-color: #333; color: #fff; padding: 15px 20px; margin-bottom: 10px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); opacity: 0; transform: translateX(100%); transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55); }
+.toast-notification.show { opacity: 1; transform: translateX(0); }
+.toast-notification.toast-success { background-color: var(--success-color); }
+.toast-notification.toast-danger { background-color: #dc3545; }
+.toast-notification.toast-warning { background-color: #ffc107; color: #333; }
+
+#loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 10000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
+.spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+.tab-content-area {
+  background-color: #fff; /* ทำให้พื้นที่เนื้อหาหลักทั้งหมดเป็นสีขาว */
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  box-shadow: var(--card-shadow); /* ย้ายเงาจาก Card มาไว้ที่นี่แทน */
+}
+
+/* ทำให้ Card ที่อยู่ข้างในโปร่งใสและไม่มีเงาซ้ำซ้อน */
+.tab-content-area .card {
+  box-shadow: none;
+  border: none;
+}
+
+.modal-dialog {
+  max-width: 800px !important; /* <--- กำหนดความกว้างสูงสุดที่นี่ */
+  width: auto !important;
+  margin: 1.75rem auto !important;
+}
+
+@media (max-width: 576px) {
+  .modal-dialog {
+    width: 95% !important; /* ทำให้เกือบเต็มจอบนมือถือ */
+  }
+}
+
+/* =================================================== */
+/* === 3. Navigation & Tabs (New Navbar Style) ======= */
+/* =================================================== */
+.navbar .nav-link {
+  cursor: pointer;
+  text-align: center; /* จัดให้ข้อความในเมนูมือถืออยู่กลาง */
+  border-bottom: 3px solid transparent;
+}
+.navbar .nav-link:hover {
+  border-bottom-color: var(--border-color);
+}
+.navbar .nav-link.active {
+  border-bottom-color: var(--primary-color);
+  font-weight: 700;
+  color: var(--primary-color) !important;
+}
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+    .table-loader {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255, 255, 255, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+    }
+
+/* =================================================== */
+/* === [NEW] Style for Sticky Module Header ======== */
+/* =================================================== */
+.module-header-sticky {
+  position: sticky;
+  top: 0;
+  background-color: rgba(255, 255, 255, 0.95); /* ทำให้พื้นหลังขาวแต่โปร่งแสงเล็กน้อย */
+  backdrop-filter: blur(8px); /* เพิ่มเอฟเฟกต์เบลอพื้นหลังที่ลอดผ่าน (สำหรับ Browser สมัยใหม่) */
+  z-index: 1020; /* ตั้งค่าให้อยู่เหนือเนื้อหาอื่นๆ เสมอ */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* เพิ่มเงาบางๆ เพื่อให้ดูมีมิติ */
+}
+
+/* =================================================== */
+/* === [NEW] Egg Loader Styles ===================== */
+/* =================================================== */
+.loading {
+    display: none; position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;
+    display: flex; justify-content: center; align-items: center;
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+}
+.egg-loader { width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; }
+.egg {
+    width: 50px; height: 65px; background-color: #fad6b7;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    animation: wobble 1.5s ease-in-out infinite;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    border: 2px solid #e69963;
+}
+@keyframes wobble {
+    0%, 100% { transform: translateX(0%) rotate(0deg); } 15% { transform: translateX(-15%) rotate(-5deg); }
+    30% { transform: translateX(10%) rotate(3deg); } 45% { transform: translateX(-8%) rotate(-3deg); }
+    60% { transform: translateX(5%) rotate(2deg); } 75% { transform: translateX(-2%) rotate(-1deg); }
+}
+
+
+</style>
