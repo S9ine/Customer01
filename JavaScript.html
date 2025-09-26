@@ -1,0 +1,2534 @@
+<script>
+// =================================================== //
+// === 1. ตัวแปรส่วนกลาง และ Event Listeners หลัก ====== //
+// =================================================== //
+let productMasterList = [];
+let supplierMasterList = [];
+let allWithdrawalData = [], allReceiptData = [], allSortingData = [], allCheckHistoryData = [], allMaintenanceData = [];
+let allSupplierData = [];
+let allCheckData = {};
+let branchMasterList = [];
+let allReturnContactsMasterList = [];
+let addProductModal;
+let editProductModal;
+let allProductManagementData = [];
+let allProductManagementHeaders = [];
+let currentWithdrawalPage = 1, currentReceiptPage = 1, currentSortingPage = 1, currentCheckHistoryPage = 1, currentMaintenancePage = 1;
+const ROWS_PER_PAGE = 10;
+
+// Form and Modal variables
+let withdrawalForm, withdrawalItemTableBody, wdSubmitBtn, withdrawalModal;
+let receiptForm, receiptItemTableBody, rcSubmitBtn, supplierInput, telInput, receiptModal;
+let sortingForm, sortingItemTableBody, sortSubmitBtn, sortingModal;
+let maintenanceForm, maSubmitBtn, maintenanceModal;
+let randomCheckModal, randomCheckForm;
+let newContactModal, receiptDetailsModal;
+let returnTrayModal;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // ===================================================
+    // === 1. เตรียม Modal (หน้าต่าง Pop-up) ทั้งหมด ===
+    // ===================================================
+    withdrawalModal = new bootstrap.Modal(document.getElementById('withdrawalModal'));
+    receiptModal = new bootstrap.Modal(document.getElementById('receiptModal'));
+    sortingModal = new bootstrap.Modal(document.getElementById('sortingModal'));
+    maintenanceModal = new bootstrap.Modal(document.getElementById('maintenanceModal'));
+    randomCheckModal = new bootstrap.Modal(document.getElementById('random-check-modal'));
+    newContactModal = new bootstrap.Modal(document.getElementById('new-contact-modal'));
+    receiptDetailsModal = new bootstrap.Modal(document.getElementById('receipt-details-modal'));
+    returnTrayModal = new bootstrap.Modal(document.getElementById('returnTrayModal'));
+    addProductModal = new bootstrap.Modal(document.getElementById('addProductModal'));
+    editProductModal = new bootstrap.Modal(document.getElementById('editProductModal'));
+
+    // =================================================================
+    // === 2. เชื่อมตัวแปร JavaScript กับ Element ต่างๆ ในหน้า HTML ===
+    // =================================================================
+    // -- ฟอร์มเบิกสินค้า --
+    withdrawalForm = document.getElementById("withdrawalForm");
+    withdrawalItemTableBody = document.getElementById("withdrawalItemTableBody");
+    wdSubmitBtn = document.getElementById("wd-submit-btn");
+
+    // -- ฟอร์มรับสินค้า --
+    receiptForm = document.getElementById("receiptForm");
+    receiptItemTableBody = document.getElementById("receiptItemTableBody");
+    rcSubmitBtn = document.getElementById("rc-submit-btn");
+    supplierInput = document.getElementById("rc-supplier");
+    telInput = document.getElementById("rc-tel");
+
+    // -- ฟอร์มคัดแยกสินค้า --
+    sortingForm = document.getElementById("sortingForm");
+    sortingItemTableBody = document.getElementById("sortingItemTableBody");
+    sortSubmitBtn = document.getElementById("sort-submit-btn");
+
+    // -- ฟอร์มซ่อมบำรุง --
+    maintenanceForm = document.getElementById("maintenanceForm");
+    maSubmitBtn = document.getElementById('ma-submit-btn');
+
+    // -- ฟอร์มสุ่มเช็ค --
+    randomCheckForm = document.getElementById('randomCheckForm');
+    
+    // -- ฟอร์มอื่นๆ --
+    const newContactForm = document.getElementById("newContactForm");
+    const returnTrayForm = document.getElementById('returnTrayForm');
+    const addProductForm = document.getElementById("addProductForm");
+    const editProductForm = document.getElementById("editProductForm");
+
+    // ===================================================
+    // === 3. กำหนด Event Listeners (การดักจับ Event) ===
+    // ===================================================
+    // -- การกด Submit ฟอร์มต่างๆ --
+    if (withdrawalForm) withdrawalForm.addEventListener("submit", handleWithdrawalSubmit);
+    if (receiptForm) receiptForm.addEventListener("submit", handleReceiptSubmit);
+    if (sortingForm) sortingForm.addEventListener("submit", handleSortingSubmit);
+    if (maintenanceForm) maintenanceForm.addEventListener("submit", handleMaintenanceSubmit);
+    if (randomCheckForm) randomCheckForm.addEventListener('submit', handleRandomCheckSubmit);
+    if (newContactForm) newContactForm.addEventListener("submit", handleNewContactSubmit);
+    if (returnTrayForm) returnTrayForm.addEventListener('submit', handleReturnTraySubmit);
+    if (addProductForm) addProductForm.addEventListener("submit", handleAddProductSubmit);
+    if (editProductForm) editProductForm.addEventListener("submit", handleEditProductSubmit);
+
+    // -- การเลือก Supplier แล้วให้แสดงเบอร์โทรอัตโนมัติ --
+    if (supplierInput) {
+        supplierInput.addEventListener("input", function(e) {
+            const selectedSupplierName = e.target.value;
+            const selectedSupplier = supplierMasterList.find(s => s.name === selectedSupplierName);
+            
+            if (selectedSupplier) {
+                telInput.value = selectedSupplier.tel || "";
+            } else {
+                telInput.value = "";
+            }
+        });
+    }
+
+    // ++ [เพิ่มเข้ามา] สำหรับฟอร์มเบิกสินค้า: แสดงยอดแผงคงค้าง ++
+    const wdDepartmentInput = document.getElementById('wd-department');
+    if (wdDepartmentInput) {
+        wdDepartmentInput.addEventListener('input', function() {
+            const selectedBranch = branchMasterList.find(b => b.name === this.value);
+            const balanceDiv = document.getElementById('wd-current-tray-balance');
+            if (selectedBranch) {
+                const contactData = allSupplierData.find(c => c.id === selectedBranch.id);
+                balanceDiv.textContent = contactData ? formatNumber(contactData.trayBalance) : '0';
+                balanceDiv.classList.toggle('text-danger', contactData && contactData.trayBalance > 0);
+            } else {
+                balanceDiv.textContent = 'เลือกสาขา...';
+                balanceDiv.classList.remove('text-danger');
+            }
+        });
+    }
+
+    // ++ [เพิ่มเข้ามา] สำหรับฟอร์มรับสินค้า: แสดงยอดแผงคงค้าง ++
+    if (supplierInput) { // ใช้ตัวแปรเดิมที่ประกาศไว้แล้ว
+        supplierInput.addEventListener('input', function() {
+            const selectedSupplier = supplierMasterList.find(s => s.name === this.value);
+            const balanceDiv = document.getElementById('rc-current-tray-balance');
+            if (selectedSupplier) {
+                const contactData = allSupplierData.find(c => c.id === selectedSupplier.id);
+                balanceDiv.textContent = contactData ? formatNumber(contactData.trayBalance) : '0';
+                balanceDiv.classList.toggle('text-danger', contactData && contactData.trayBalance > 0);
+            } else {
+                balanceDiv.textContent = 'เลือกซัพพลายเออร์...';
+                balanceDiv.classList.remove('text-danger');
+            }
+        });
+    }
+    
+    // -- ควบคุมการแสดงผลช่องกรอกรหัสสาขา --
+    const contactTypeDropdown = document.getElementById("new-contact-type");
+    const branchIdGroup = document.getElementById("branch-id-group");
+    if (contactTypeDropdown) {
+        contactTypeDropdown.addEventListener('change', function() {
+            if (this.value === 'Branch') {
+                branchIdGroup.style.display = 'block';
+            } else {
+                branchIdGroup.style.display = 'none';
+            }
+        });
+    }
+
+// -- การทำงานของ Tab ด้านบน --
+    document.getElementById('mainNavLinks').addEventListener('click', e => {
+        if (e.target.matches('.nav-link')) {
+            const tabName = e.target.getAttribute("data-tab");
+
+            document.querySelectorAll("#mainNavLinks .nav-link").forEach(tab => tab.classList.remove("active"));
+            e.target.classList.add("active");
+            document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
+            document.getElementById(tabName + "-section").classList.add("active");
+
+            // Load data only on the first click
+            // [ใหม่] เพิ่มเงื่อนไขสำหรับโหลดข้อมูลหน้าเบิกสินค้า
+            if (tabName === 'withdrawal' && allWithdrawalData.length === 0) loadWithdrawalPage(1);
+            if (tabName === 'suppliers' && allSupplierData.length === 0) loadSupplierDashboard();
+            if (tabName === 'receipt' && allReceiptData.length === 0) loadReceiptPageData();
+            if (tabName === 'sorting' && allSortingData.length === 0) loadSortingHistory();
+            if (tabName === 'check-history' && allCheckHistoryData.length === 0) loadCheckHistory();
+            if (tabName === 'maintenance' && allMaintenanceData.length === 0) loadMaintenanceHistory();
+            if (tabName === 'stock' && !document.getElementById('product-management-table-body').hasChildNodes()) {
+                loadProductManagementData();
+            }
+        }
+    });
+
+
+    // -- การทำงานของช่องค้นหา --
+    document.getElementById('withdrawal-search').addEventListener('input', debounce(() => loadWithdrawalPage(1), 500));
+    document.getElementById('receipt-search').addEventListener('input', debounce(() => loadReceiptPageData(1), 500));
+    document.getElementById('sorting-search').addEventListener('input', debounce(() => loadSortingHistory(1), 500));
+    // ++ [แก้ไข] บรรทัดนี้ ++
+    document.getElementById('product-management-search').addEventListener('input', debounce(displayProductManagementTable, 500));
+    document.getElementById('check-history-search').addEventListener('input', () => { currentCheckHistoryPage = 1; displayCheckHistory(); });
+    document.getElementById('maintenance-search').addEventListener('input', () => { currentMaintenancePage = 1; displayMaintenanceHistory(); });
+    document.getElementById('supplier-search').addEventListener('input', displaySupplierDashboard);
+
+    
+    // -- ทำให้เมนู Hamburger ปิดเองเมื่อคลิกเลือกรายการ --
+    const navLinks = document.querySelectorAll('#mainNavLinks .nav-link');
+    const menuToggle = document.getElementById('mainNavbar');
+    const bsCollapse = new bootstrap.Collapse(menuToggle, {toggle: false});
+    navLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+            if (menuToggle.classList.contains('show')) {
+                bsCollapse.toggle();
+            }
+        });
+    });
+
+});
+
+
+window.addEventListener('load', () => {
+    const pageToLoad = typeof initialPage !== 'undefined' ? initialPage : 'stock';
+    
+    const pageHeader = document.querySelector('.page-header');
+    const mainNavbar = document.querySelector('.navbar');
+    if (pageHeader) pageHeader.style.display = 'none';
+    if (mainNavbar) mainNavbar.style.display = 'none';
+
+    const mainContainer = document.querySelector('.main-container');
+    const currentSection = document.querySelector(`#${pageToLoad}-section`);
+
+    const moduleThemes = {
+        'stock':         { color: '#3b82f6', icon: 'bi-bar-chart-line-fill' },
+        'receipt':       { color: '#22c55e', icon: 'bi-box-arrow-in-down' },
+        'withdrawal':    { color: '#8b5cf6', icon: 'bi-box-arrow-up' },
+        'sorting':       { color: '#f97316', icon: 'bi-columns-gap' },
+        'suppliers':     { color: '#0ea5e9', icon: 'bi-people-fill' },
+        'check-history': { color: '#14b8a6', icon: 'bi-clipboard2-check-fill' },
+        'maintenance':   { color: '#ef4444', icon: 'bi-tools' }
+    };
+
+    const currentTheme = moduleThemes[pageToLoad] || { color: '#6b7280', icon: 'bi-app' };
+
+    if (mainContainer && currentSection) {
+        const originalCardHeader = currentSection.querySelector('.card-header');
+        const cardTitleElem = originalCardHeader ? originalCardHeader.querySelector('.card-title') : null;
+        const cardActionsElem = originalCardHeader ? originalCardHeader.querySelector('.card-header-actions') : null;
+
+        const titleText = cardTitleElem ? cardTitleElem.innerText : 'Menu';
+        const actionsHtml = cardActionsElem ? cardActionsElem.innerHTML : '';
+
+        const moduleHeaderHtml = `
+            <div class="module-header-sticky d-flex justify-content-between align-items-center mb-4 px-4 py-3" 
+                 style="background-color: ${currentTheme.color}; color: white; border-radius: 0.75rem;">
+                
+                <div class="d-flex align-items-center">
+                    <a href="${dashboardUrl}" class="btn btn-sm btn-outline-light me-3" onclick="showLoader()">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                    <h4 class="mb-0 d-flex align-items-center">
+                        <i class="bi ${currentTheme.icon} me-2"></i>
+                        ${titleText}
+                    </h4>
+                </div>
+
+                <div class="card-header-actions d-flex align-items-center gap-2">
+                    ${actionsHtml}
+                </div>
+            </div>
+        `;
+        
+        mainContainer.insertAdjacentHTML('afterbegin', moduleHeaderHtml);
+
+        if (originalCardHeader) {
+            originalCardHeader.remove();
+        }
+    }
+    
+    const tabToActivate = document.querySelector(`.nav-link[data-tab="${pageToLoad}"]`);
+    if (tabToActivate) {
+        tabToActivate.click();
+    } else {
+        document.querySelector('.nav-link[data-tab="stock"]').click();
+    }
+
+    const pagesWithForms = ['receipt', 'withdrawal', 'sorting'];
+    if (pagesWithForms.includes(pageToLoad)) {
+        loadAllOptions();
+        addWithdrawalItemRow();
+        addReceiptItemRow();
+        addSortingItemRow();
+    }
+});
+
+function loadSupplierDashboard() {
+    showLoader();
+    google.script.run
+        .withSuccessHandler(response => {
+            hideLoader();
+            if (response.error) {
+                onFailure({ message: response.error });
+                return;
+            }
+            allSupplierData = response; // <-- เก็บข้อมูลทั้งหมดไว้ที่นี่
+            displaySupplierDashboard(); // <-- เรียกใช้ฟังก์ชันแสดงผล (ไม่ต้องส่งข้อมูลไปแล้ว)
+        })
+        .withFailureHandler(onFailure)
+        .getContactDashboardData();
+}
+
+function displaySupplierDashboard() {
+    const tableBody = document.getElementById('supplierTableBody');
+    tableBody.innerHTML = "";
+
+    const searchTerm = document.getElementById('supplier-search').value.toLowerCase();
+
+    // เปลี่ยนชื่อตัวแปร allSupplierData เป็น allContactData เพื่อความชัดเจน
+    const allContactData = allSupplierData; 
+
+    const filteredData = searchTerm ?
+        allContactData.filter(con =>
+            con.id.toLowerCase().includes(searchTerm) ||
+            con.name.toLowerCase().includes(searchTerm) ||
+            con.type.toLowerCase().includes(searchTerm) || // ++ เพิ่มการค้นหาจากประเภท
+            (con.tel && con.tel.toLowerCase().includes(searchTerm))
+        ) :
+        allContactData;
+
+    if (!filteredData || filteredData.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">ไม่พบข้อมูล</td></tr>';
+        return;
+    }
+
+    filteredData.forEach(con => {
+        const row = tableBody.insertRow();
+        const balance = con.trayBalance || 0;
+        const balanceClass = balance > 0 ? 'text-danger fw-bold' : '';
+
+        // ++ เพิ่ม Badge สำหรับแสดงประเภทให้สวยงาม ++
+        const typeBadge = con.type === 'Supplier'
+          ? `<span class="badge bg-success">${con.type}</span>`
+          : `<span class="badge bg-info text-dark">${con.type}</span>`;
+
+        // ++ อัปเดตการแสดงผลให้ตรงกับตารางใหม่ ++
+        row.innerHTML = `
+            <td>${con.id}</td>
+            <td>${con.name}</td>
+            <td class="text-center">${typeBadge}</td>
+            <td>${con.tel || '-'}</td>
+            <td class="text-end ${balanceClass}">${balance.toLocaleString('th-TH')}</td>
+        `;
+    });
+}
+
+// ฟังก์ชันสำหรับเปิด Modal คืนแผง
+function openReturnTrayModal() {
+    document.getElementById('returnTrayForm').reset();
+    returnTrayModal.show();
+}
+
+
+
+function handleReturnTraySubmit(e) {
+    e.preventDefault();
+    
+    // ดึงค่าจาก input ที่เราเปลี่ยน ID แล้ว
+    const fullContactName = document.getElementById('return-contact').value;
+    const quantity = document.getElementById('return-tray-quantity').value;
+
+    if (!fullContactName || !quantity || parseInt(quantity) <= 0) {
+        showToast("กรุณากรอกข้อมูลให้ครบถ้วน", "warning");
+        return;
+    }
+    
+    // ค้นหาผู้ติดต่อจาก list ใหม่ที่รวม Supplier และ Branch
+    const selectedContact = allReturnContactsMasterList.find(c => `${c.name} (${c.type})` === fullContactName);
+    
+    if (!selectedContact) {
+        showToast("ไม่พบรายชื่อที่เลือก กรุณาเลือกจากในลิสต์", "danger");
+        return;
+    }
+
+    showLoader();
+    google.script.run
+        .withSuccessHandler(response => {
+            hideLoader();
+            if (response.success) {
+                showToast(response.message, 'success');
+                returnTrayModal.hide();
+                loadSupplierDashboard(); // โหลดข้อมูล Dashboard ใหม่
+            } else {
+                showToast(response.message, 'danger');
+            }
+        })
+        .withFailureHandler(onFailure)
+        .returnEggTrays(selectedContact.id, quantity); // ส่ง ID ของผู้ติดต่อที่เจอไป
+}
+
+// =================================================== //
+// === 2. ระบบเบิกสินค้า (Withdrawal System) ========== //
+// =================================================== //
+function handleWithdrawalSubmit(e) {
+    e.preventDefault();
+    wdSubmitBtn.disabled = true;
+
+    // 1. รวบรวมรายการสินค้าที่เบิก
+    const items = Array.from(withdrawalItemTableBody.rows).map(r => ({
+        id: r.dataset.productId,
+        name: r.querySelector('[name="itemName"]').value,
+        quantity: r.querySelector('[name="quantity"]').value,
+        unit: r.querySelector('[name="unit"]').value,
+        note: r.querySelector('[name="note"]').value
+    })).filter(i => i.name && i.quantity);
+
+    if (items.length === 0) {
+        showToast("กรุณากรอกรายการสินค้า", "warning");
+        wdSubmitBtn.disabled = false;
+        return;
+    }
+
+    // 2. ค้นหา ID ของสาขาที่เลือก
+    const departmentName = document.getElementById('wd-department').value;
+    const selectedBranch = branchMasterList.find(b => b.name === departmentName);
+    const departmentId = selectedBranch ? selectedBranch.id : null;
+
+    // 3. รวบรวมข้อมูลทั้งหมดเพื่อส่งไป Server
+    const docId = document.getElementById("wd-docId").value;
+    const formData = {
+        docId: docId,
+        requester: document.getElementById("wd-requester").value,
+        department: departmentName,
+        departmentId: departmentId, // ส่ง ID ของสาขาไปด้วย
+        approver: document.getElementById("wd-approver").value,
+        items: items,
+        // เพิ่มข้อมูลแผงไข่ที่ส่งไปพร้อมกับสินค้า
+        traysSent: document.getElementById('wd-tray-sent').value || 0
+    };
+
+    // 4. ส่งข้อมูลไปที่ Server
+    const serverFunc = docId ? 'updateWithdrawalDataFromWebApp' : 'saveDataFromWebApp';
+    
+    showLoader();
+    google.script.run.withSuccessHandler(res => {
+        hideLoader();
+        if (res.success) {
+            withdrawalModal.hide();
+        }
+        onSaveSuccess(res, "withdrawal"); 
+    }).withFailureHandler(onFailure)[serverFunc](formData);
+}
+
+
+function openWithdrawalModal() {
+    resetWithdrawalForm();
+    document.getElementById("withdrawalModalLabel").innerText = "ฟอร์มเบิกสินค้า";
+    wdSubmitBtn.innerText = "บันทึกข้อมูล";
+    withdrawalModal.show();
+}
+
+function addWithdrawalItemRow(item = {}) {
+    const row = withdrawalItemTableBody.insertRow();
+    const productId = item.id || ''; 
+    row.dataset.productId = productId;
+    row.innerHTML = `
+        <td class="align-top">
+          <input class="form-control" list="product-options" name="itemName" value="${item.name || ''}" required oninput="handleProductSelection(this)" placeholder="ค้นหาสินค้า...">
+        </td>
+        <td class="align-top">
+            <input type="number" class="form-control" name="quantity" value="${item.quantity || ''}" min="1" required oninput="debouncedCheckStock(this)">
+            <span class="form-text stock-status-message"></span>
+        </td>
+        <td class="align-top"><input type="text" class="form-control" name="unit" value="${item.unit || 'ฟอง'}"></td>
+        <td class="align-top"><input type="text" class="form-control" name="note" value="${item.note || ''}"></td>
+        <td class="align-top"><button type="button" class="btn btn-danger btn-sm" onclick="deleteItemRow(this)"><i class="bi bi-x"></i></button></td>`;
+}
+
+function resetWithdrawalForm() {
+    withdrawalForm.reset();
+    document.getElementById("wd-docId").value = "";
+    withdrawalItemTableBody.innerHTML = "";
+    addWithdrawalItemRow();
+}
+
+function debounce(func, delay = 500) {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+            func.apply(this, args);
+        }, delay);
+    };
+}
+
+function loadWithdrawalPage(page = 1) {
+    showLoader();
+    const searchTerm = document.getElementById('withdrawal-search').value;
+    google.script.run
+        .withSuccessHandler(response => {
+            hideLoader();
+            if (response.error) {
+                onFailure({ message: response.error });
+                return;
+            }
+            allWithdrawalData = response.data || [];
+            currentWithdrawalPage = page;
+            
+            displayWithdrawalHistory(response.totalItems);
+        })
+        .withFailureHandler(onFailure)
+        .getWithdrawalData(page, ROWS_PER_PAGE, searchTerm);
+}
+
+function displayWithdrawalHistory(totalItems) {
+    const dataToDisplay = allWithdrawalData;
+    const body = document.getElementById("withdrawalHistoryTableBody");
+    body.innerHTML = "";
+
+    if (!dataToDisplay || dataToDisplay.length === 0) {
+        body.innerHTML = '<tr><td colspan="6" class="text-center">ไม่พบข้อมูล</td></tr>';
+    } else {
+        dataToDisplay.forEach(rec => {
+            const itemsButton = `<button class="btn btn-outline-secondary btn-sm" onclick='openReceiptDetailsModal(${JSON.stringify(rec)})'>ดู (${rec.items.length})</button>`;
+            const row = body.insertRow();
+            row.innerHTML = `
+                <td>${rec.docId}</td>
+                <td>${rec.date}</td>
+                <td>${rec.requester}</td>
+                <td>${rec.approver}</td>
+                <td class="text-center">${itemsButton}</td>
+                <td class="text-end">
+                    <div class="btn-group btn-group-sm">
+                        ${getPrintButtonHtml("Withdrawal", rec)}
+                        ${getEditButtonHtml("Withdrawal", rec)}
+                        ${getDeleteButtonHtml("deleteWithdrawalRecord", rec.docId)}
+                    </div>
+                </td>`;
+        });
+    }
+
+    // ให้เหลือ setupPagination ไว้แค่ในฟังก์ชันนี้อันเดียว
+    setupPagination('withdrawal-pagination', totalItems, currentWithdrawalPage, ROWS_PER_PAGE, page => {
+        loadWithdrawalPage(page);
+    });
+}
+
+function editWithdrawalRecord(rec) {
+    resetWithdrawalForm();
+    document.getElementById("wd-docId").value = rec.docId;
+    document.getElementById("wd-requester").value = rec.requester;
+    document.getElementById("wd-department").value = rec.department;
+    document.getElementById("wd-approver").value = rec.approver;
+    document.getElementById('wd-tray-sent').value = rec.traysSent || ''; // ++ ตรวจสอบว่ามีบรรทัดนี้ ++
+    
+    withdrawalItemTableBody.innerHTML = "";
+    (rec.items || []).forEach(item => {
+        const product = productMasterList.find(p => p.name === item.name);
+        addWithdrawalItemRow({ ...item, id: product ? product.id : '' });
+    });
+
+    document.getElementById("withdrawalModalLabel").innerText = `แก้ไขเอกสาร: ${rec.docId}`;
+    wdSubmitBtn.innerText = "อัปเดตข้อมูล";
+    withdrawalModal.show();
+}
+
+function deleteWithdrawalRecord(docId) {
+    Swal.fire({
+        title: 'ยืนยันการลบ',
+        text: `คุณต้องการลบเอกสารเบิก ${docId} ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33', // สีแดงสำหรับปุ่มยืนยัน
+        cancelButtonColor: '#6c757d', // สีเทาสำหรับปุ่มยกเลิก
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    }).then((result) => {
+        // โค้ดจะทำงานต่อเมื่อผู้ใช้กดปุ่ม "ใช่, ลบเลย!" เท่านั้น
+        if (result.isConfirmed) {
+            showLoader();
+            google.script.run.withSuccessHandler(res => {
+                hideLoader();
+                if (res.success) {
+                    showToast(res.message, 'success');
+                    loadWithdrawalPage(1); // Reload data
+                } else {
+                    showToast(res.message, 'danger');
+                }
+            }).withFailureHandler(onFailure).deleteRecordByDocId(docId);
+        }
+    });
+}
+
+// =================================================== //
+// === 3. ระบบรับสินค้า (Receipt System) ============= //
+// =================================================== //
+// ในไฟล์ JavaScript.html
+
+function handleReceiptSubmit(e) {
+    e.preventDefault();
+    rcSubmitBtn.disabled = true;
+
+    const items = Array.from(receiptItemTableBody.rows).map(r => ({
+        name: r.querySelector('[name="itemName"]').value,
+        quantity: r.querySelector('[name="quantity"]').value,
+        unit: r.querySelector('[name="unit"]').value,
+        weight: r.querySelector('[name="weight"]').value,
+        note: r.querySelector('[name="note"]').value
+    })).filter(i => i.name && i.quantity);
+
+    if (items.length === 0) {
+        showToast("กรุณากรอกรายการสินค้า", "warning");
+        rcSubmitBtn.disabled = false;
+        return;
+    }
+
+    const docId = document.getElementById("rc-docId").value;
+    
+    // ค้นหา ID ของ Supplier ที่เลือก
+    const selectedSupplierName = supplierInput.value;
+    const selectedSupplier = supplierMasterList.find(s => s.name === selectedSupplierName);
+    const contactId = selectedSupplier ? selectedSupplier.id : null;
+
+    // รวบรวมข้อมูลทั้งหมดเพื่อส่งไป Server
+    const formData = {
+        docId: docId,
+        supplier: selectedSupplierName,
+        contactId: contactId,
+        tel: telInput.value,
+        receiver: document.getElementById("rc-receiver").value,
+        items: items,
+        traysReceived: document.getElementById('rc-tray-received').value || 0,
+        traysReturned: document.getElementById('rc-tray-returned').value || 0
+    };
+
+    const serverFunc = docId ? 'updateReceiptDataFromWebApp' : 'saveReceiptDataFromWebApp';
+    showLoader();
+    google.script.run.withSuccessHandler(res => {
+        hideLoader();
+        if (res.success) {
+            receiptModal.hide();
+            // เคลียร์ค่าในช่องกรอกแผงไข่ด้วย
+            document.getElementById('rc-tray-received').value = "";
+            document.getElementById('rc-tray-returned').value = "";
+        }
+        onSaveSuccess(res, "receipt");
+    }).withFailureHandler(onFailure)[serverFunc](formData);
+}
+
+function openReceiptModal() {
+    resetReceiptForm();
+    document.getElementById("receiptModalLabel").innerText = "ฟอร์มรับสินค้า";
+    rcSubmitBtn.innerText = "บันทึกข้อมูล";
+    receiptModal.show();
+}
+
+function addReceiptItemRow(item = {}) {
+    const newRow = receiptItemTableBody.insertRow();
+    newRow.innerHTML = `
+        <td>
+        <input class="form-control" list="product-options" name="itemName" value="${item.name || ''}" required oninput="handleProductSelection(this)" placeholder="ค้นหาสินค้า...">
+        </td>
+        <td><input type="number" class="form-control" name="quantity" value="${item.quantity || ''}" min="1" required></td>
+        <td><input type="text" class="form-control" name="unit" value="${item.unit || 'ฟอง'}"></td>
+        <td><input type="number" step="any" class="form-control" name="weight" value="${item.weight || ''}" placeholder="กก., กรัม"></td>
+        <td><input type="text" class="form-control" name="note" value="${item.note || ''}"></td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="deleteItemRow(this)"><i class="bi bi-x"></i></button></td>`;
+}
+
+function resetReceiptForm() {
+    receiptForm.reset();
+    document.getElementById("rc-docId").value = "";
+    receiptItemTableBody.innerHTML = "";
+    addReceiptItemRow();
+    telInput.value = "";
+}
+
+function loadReceiptPageData(page = 1) {
+    showLoader();
+    const searchTerm = document.getElementById('receipt-search').value;
+
+    // Promise.all ยังคงใช้ได้ดีสำหรับการดึงข้อมูล 2 ส่วนพร้อมกัน
+    Promise.all([
+        new Promise((resolve, reject) => google.script.run
+            .withSuccessHandler(resolve).withFailureHandler(reject)
+            .getReceiptData(page, ROWS_PER_PAGE, searchTerm)),
+        new Promise((resolve, reject) => google.script.run
+            .withSuccessHandler(resolve).withFailureHandler(reject)
+            .getAllCheckData())
+    ]).then(([receiptResponse, checks]) => {
+        if (receiptResponse.error) {
+            onFailure({ message: receiptResponse.error });
+            return;
+        }
+
+        allReceiptData = receiptResponse.data || []; // ตอนนี้ allReceiptData จะมีแค่ข้อมูลของหน้าปัจจุบัน
+        allCheckData = checks || {};
+        currentReceiptPage = page;
+        
+        // ส่ง totalItems ไปให้ display function เพื่อสร้าง pagination
+        displayReceiptHistory(receiptResponse.totalItems); 
+        
+        hideLoader();
+    }).catch(error => {
+        hideLoader();
+        onFailure(error);
+    });
+}
+
+function openReceiptDetailsModal(record) {
+    const modalTitle = document.getElementById('receipt-details-title');
+    const tableBody = document.getElementById('receipt-details-body');
+    
+    const docType = record.docId.startsWith('WD') ? 'ใบเบิกสินค้า' : 'ใบรับสินค้า';
+    modalTitle.innerText = `รายการสินค้าใน: ${record.docId} (${docType})`;
+    
+    tableBody.innerHTML = ''; 
+    
+    if (!record.items || record.items.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="5" class="text-center">ไม่พบรายการสินค้า</td></tr>`;
+        receiptDetailsModal.show();
+        return;
+    }
+
+    (record.items || []).forEach(item => {
+        const row = tableBody.insertRow();
+        const quantity = formatNumber(item.quantity);
+        
+        // ตรวจสอบให้แน่ใจว่า item.weight มีอยู่จริงก่อนเรียกใช้ฟังก์ชัน
+        const weight = (item.weight !== undefined && item.weight !== null) ? formatCurrency(item.weight) : '-';
+        
+        row.innerHTML = `
+            <td>${item.name}</td>
+            <td class="text-end">${quantity}</td>
+            <td class="text-center">${item.unit || ''}</td>
+            <td class="text-end">${weight}</td>
+            <td>${item.note || ''}</td>
+        `;
+    });
+    
+    receiptDetailsModal.show();
+}
+
+function displayReceiptHistory(totalItems) { // รับ totalItems มาด้วย
+    const body = document.getElementById("receiptHistoryTableBody");
+    body.innerHTML = "";
+    
+    if (!allReceiptData || allReceiptData.length === 0) {
+        body.innerHTML = '<tr><td colspan="6" class="text-center">ไม่พบข้อมูล</td></tr>';
+        setupPagination('receipt-pagination', 0, 1, ROWS_PER_PAGE, () => {});
+        return;
+    }
+
+    // ไม่ต้อง slice ข้อมูลอีกต่อไป เพราะ Server ส่งมาให้เฉพาะหน้าปัจจุบันแล้ว
+    allReceiptData.forEach(rec => {
+        // ... (โค้ดส่วนของการสร้างตารางเหมือนเดิม) ...
+        const row = body.insertRow();
+        const hasBeenChecked = allCheckData[rec.docId] && allCheckData[rec.docId].length > 0;
+        const statusBadge = hasBeenChecked ? ` <span class="badge bg-primary">ตรวจสอบแล้ว</span>` : '';
+        const docIdCell = `<td>${rec.docId}${statusBadge}</td>`;
+
+        const itemsButton = `<button class="btn btn-outline-secondary btn-sm" onclick='openReceiptDetailsModal(${JSON.stringify(rec)})'>ดู (${rec.items.length})</button>`;
+        
+        const checkButton = getCheckButtonHtml(rec, hasBeenChecked);
+        
+        row.innerHTML = `
+            ${docIdCell}
+            <td>${rec.date}</td>
+            <td>${rec.supplier}</td>
+            <td>${rec.receiver}</td>
+            <td>${itemsButton}</td>
+            <td class="text-end"><div class="btn-group btn-group-sm">${checkButton}${getPrintButtonHtml("Receipt", rec)}${getEditButtonHtml("Receipt", rec)}${getDeleteButtonHtml("deleteReceiptRecord", rec.docId)}</div></td>
+        `;
+    });
+    
+    // สร้าง Pagination จาก totalItems ที่ได้จาก Server
+    setupPagination('receipt-pagination', totalItems, currentReceiptPage, ROWS_PER_PAGE, page => {
+        loadReceiptPageData(page);
+    });
+}
+
+function editReceiptRecord(rec) {
+    resetReceiptForm(); 
+    document.getElementById("rc-docId").value = rec.docId;
+    supplierInput.value = rec.supplier;
+    telInput.value = rec.tel || '';
+    document.getElementById("rc-receiver").value = rec.receiver;
+    
+    // ++ เพิ่ม 2 บรรทัดนี้เข้ามา ++
+    document.getElementById('rc-tray-received').value = rec.traysReceived || '';
+    document.getElementById('rc-tray-returned').value = rec.traysReturned || '';
+    
+    receiptItemTableBody.innerHTML = "";
+    (rec.items || []).forEach(item => addReceiptItemRow(item));
+    
+    document.getElementById("receiptModalLabel").innerText = `แก้ไขเอกสาร: ${rec.docId}`;
+    rcSubmitBtn.innerText = "อัปเดตข้อมูล";
+    receiptModal.show();
+}
+
+function deleteReceiptRecord(docId) {
+    Swal.fire({
+        title: 'ยืนยันการลบ',
+        text: `คุณต้องการลบเอกสารรับเข้า ${docId} ใช่หรือไม่? สต็อกและยอดแผงจะถูกปรับคืน`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            showLoader();
+            google.script.run.withSuccessHandler(res => {
+                hideLoader();
+                if (res.success) {
+                    showToast(res.message, 'success');
+                    loadReceiptPageData();
+                } else {
+                    showToast(res.message, 'danger');
+                }
+            }).withFailureHandler(onFailure).deleteReceiptByDocId(docId);
+        }
+    });
+}
+
+// =================================================== //
+// === 4. ระบบคัดแยกสินค้า (Sorting System) ========== //
+// =================================================== //
+function handleSortingSubmit(e) { 
+    e.preventDefault(); 
+    sortSubmitBtn.disabled = true; 
+    const sourceQty = parseFloat(document.getElementById("sort-sourceQty").value); 
+    let totalSortedQty = 0; 
+    const sortedItems = Array.from(sortingItemTableBody.rows).map(r => { 
+        const qty = parseFloat(r.querySelector('[name="quantity"]').value); 
+        if (!isNaN(qty)) totalSortedQty += qty;
+        return { name: r.querySelector('[name="itemName"]').value, quantity: qty, unit: r.querySelector('[name="unit"]').value } 
+    }).filter(i => i.name && i.quantity > 0); 
+
+    if (sortedItems.length === 0) { 
+        showToast("กรุณากรอกรายการคัดแยก", "warning"); 
+        sortSubmitBtn.disabled = false; 
+        return; 
+    } 
+    if (totalSortedQty !== sourceQty && !confirm(`จำนวนไม่ตรงกัน! ต้นทาง: ${sourceQty}, คัดแยกได้: ${totalSortedQty}\nคุณต้องการบันทึกต่อหรือไม่?`)) { 
+        sortSubmitBtn.disabled = false; 
+        return; 
+    } 
+    const docId = document.getElementById("sort-docId").value; 
+    const formData = { 
+        docId: docId, 
+        refDocId: document.getElementById("sort-refDocId").value, 
+        sourceItem: document.getElementById("sort-sourceItem").value, 
+        sourceQty: sourceQty, 
+        sortedItems: sortedItems 
+    }; 
+    const serverFunc = docId ? 'updateSortingDataFromWebApp' : 'saveSortingDataFromWebApp'; 
+    showLoader(); 
+    google.script.run.withSuccessHandler(res => { 
+        hideLoader(); 
+        if (res.success) sortingModal.hide();
+        onSaveSuccess(res, "sorting"); 
+    }).withFailureHandler(onFailure)[serverFunc](formData); 
+}
+
+function openSortingModal() {
+    resetSortingForm();
+    document.getElementById("sortingModalLabel").innerText = "ฟอร์มคัดแยกสินค้า";
+    sortSubmitBtn.innerText = "บันทึกการคัดแยก";
+    sortingModal.show();
+}
+
+function addSortingItemRow(item = {}) {
+    const newRow = sortingItemTableBody.insertRow();
+    newRow.innerHTML = `
+        <td>
+        <input class="form-control" list="product-options" name="itemName" value="${item.name || ''}" required oninput="handleProductSelection(this)" placeholder="ค้นหาสินค้า...">
+        </td>
+        <td><input type="number" step="any" class="form-control" name="quantity" value="${item.quantity || ''}" min="1" required></td>
+        <td><input type="text" class="form-control" name="unit" value="${item.unit || 'ฟอง'}"></td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="deleteItemRow(this)"><i class="bi bi-x"></i></button></td>`;
+}
+
+function resetSortingForm() { 
+    sortingForm.reset(); 
+    document.getElementById("sort-docId").value = ""; 
+    sortingItemTableBody.innerHTML = ""; 
+    addSortingItemRow(); 
+    document.getElementById("source-info").style.display = "none"; 
+    document.getElementById("sort-refDocId").readOnly = false; 
+    document.getElementById("fetch-btn").disabled = false; 
+}
+
+function fetchDataForSorting() {
+    const refDocId = document.getElementById("sort-refDocId").value;
+    if (!refDocId) {
+        showToast("กรุณากรอกเลขเอกสาร GRN", "warning");
+        return;
+    }
+
+    const fetchBtn = document.getElementById("fetch-btn");
+    fetchBtn.disabled = true;
+    showLoader();
+
+    google.script.run
+        .withSuccessHandler(response => {
+            hideLoader();
+            fetchBtn.disabled = false;
+
+            if (response.success) {
+                const selectionArea = document.getElementById("item-selection-area");
+                selectionArea.innerHTML = ""; // ล้างตัวเลือกเก่าทุกครั้ง
+                
+                // --- ส่วนที่แก้ไข ---
+                const summary = response.data.summary;
+                const items = response.data.items;
+
+                // 1. แสดงยอดรวมในฟอร์มเป็นค่าเริ่มต้น
+                document.getElementById("sort-sourceItem").value = summary.itemName;
+                document.getElementById("sort-sourceQty").value = summary.totalQuantity;
+                document.getElementById("source-info").style.display = "block";
+
+                // 2. ถ้ามีรายการย่อยมากกว่า 1 รายการ ให้สร้างปุ่มตัวเลือก
+                if (items.length > 1) {
+                    selectionArea.innerHTML = '<h6>หรือเลือกคัดแยกจากรายการย่อย:</h6>';
+                    
+                    // เพิ่มปุ่ม "ใช้ยอดรวม" เพื่อให้กลับมาเลือกยอดรวมได้
+                    const totalButton = document.createElement('button');
+                    totalButton.type = 'button';
+                    totalButton.className = 'btn btn-primary btn-sm me-2 mb-2'; // ทำให้เด่นกว่า
+                    totalButton.textContent = `ใช้ยอดรวมทั้งหมด (${summary.totalQuantity.toLocaleString('th-TH')})`;
+                    totalButton.onclick = () => {
+                        document.getElementById("sort-sourceQty").value = summary.totalQuantity;
+                    };
+                    selectionArea.appendChild(totalButton);
+
+                    // สร้างปุ่มสำหรับแต่ละรายการย่อย
+                    items.forEach(item => {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'btn btn-outline-secondary btn-sm me-2 mb-2';
+                        button.textContent = `${item.itemName} (${item.quantity.toLocaleString('th-TH')})`;
+                        
+                        button.onclick = () => {
+                            // เมื่อคลิกเลือกรายการย่อย ให้ "เปลี่ยน" ตัวเลขในฟอร์ม
+                            document.getElementById("sort-sourceQty").value = item.quantity;
+                        };
+                        selectionArea.appendChild(button);
+                    });
+                }
+                
+                showToast("ดึงข้อมูลสำเร็จ", "success");
+
+            } else {
+                showToast(response.message, "danger");
+            }
+        })
+        .withFailureHandler(onFailure)
+        .fetchReceiptForSortingWebApp(refDocId);
+}
+
+function loadSortingHistory(page = 1) {
+    showLoader();
+    const searchTerm = document.getElementById('sorting-search').value;
+    google.script.run
+        .withSuccessHandler(response => {
+            hideLoader();
+            if (response.error) {
+                onFailure({ message: response.error });
+                return;
+            }
+            // [แก้ไข] เก็บข้อมูลที่ได้จาก Server ลงตัวแปร Global
+            allSortingData = response.data || [];
+            currentSortingPage = page;
+
+            // [แก้ไข] ส่ง totalItems ที่ได้จาก Server ไปสร้าง Pagination
+            displaySortingHistory(response.totalItems);
+        })
+        .withFailureHandler(onFailure)
+        // การเรียกใช้ตอนนี้จะตรงกับฟังก์ชันฝั่ง Server ที่แก้ไขแล้ว
+        .getSortingHistory(page, ROWS_PER_PAGE, searchTerm);
+}
+
+function displaySortingHistory(totalItems) { // รับ totalItems เข้ามาเพื่อสร้าง Pagination
+    const body = document.getElementById("sortingHistoryTableBody");
+    body.innerHTML = "";
+
+    // ฟังก์ชันนี้จะแสดงผลจากตัวแปร allSortingData ที่มีข้อมูลของหน้าปัจจุบันอยู่แล้ว
+    if (!allSortingData || allSortingData.length === 0) {
+        body.innerHTML = '<tr><td colspan="5" class="text-center">ไม่พบข้อมูล</td></tr>';
+    } else {
+        allSortingData.forEach(rec => {
+            const detailsButton = `<button class="btn btn-outline-secondary btn-sm" onclick='openSortingDetailsModal(${JSON.stringify(rec)})'>ดูรายละเอียด</button>`;
+            
+            const row = body.insertRow();
+            row.innerHTML = `
+                <td>${rec.docId}</td>
+                <td>${rec.date}</td>
+                <td>${rec.refDocId}</td>
+                <td>${detailsButton}</td>
+                <td class="text-end">
+                    <div class="btn-group btn-group-sm">
+                        ${getPrintButtonHtml("Sorting", rec)}
+                        ${getEditButtonHtml("Sorting", rec)}
+                        ${getDeleteButtonHtml("deleteSortingRecord", rec.docId)}
+                    </div>
+                </td>
+            `;
+        });
+    }
+
+    // [แก้ไข] Pagination จะเรียก loadSortingHistory เพื่อไปดึงข้อมูลหน้าใหม่จาก Server
+    setupPagination('sorting-pagination', totalItems, currentSortingPage, ROWS_PER_PAGE, page => {
+        loadSortingHistory(page);
+    });
+}
+
+/**
+ * ฟังก์ชันสำหรับนำข้อมูลการคัดแยกไปใส่ในฟอร์มแก้ไข
+ * [REVISED] แก้ไขให้ทนทานต่อข้อมูลที่ผิดรูปแบบมากขึ้น
+ * @param {object} rec - ข้อมูลของเอกสารการคัดแยก
+ */
+function editSortingRecord(rec) {
+    // รีเซ็ตฟอร์มให้เป็นค่าเริ่มต้น
+    resetSortingForm();
+
+    // ตั้งค่าข้อมูลพื้นฐานของเอกสาร
+    document.getElementById("sort-docId").value = rec.docId;
+    document.getElementById("sort-refDocId").value = rec.refDocId;
+
+    // --- ส่วนที่แก้ไข เริ่มต้น ---
+    // แยกชื่อสินค้าและจำนวนของ "สินค้าต้นทาง" อย่างปลอดภัย
+    document.getElementById("sort-sourceItem").value = rec.sourceItem.split(' (')[0];
+
+    const sourceMatch = rec.sourceItem.match(/\(([^)]+)\)/); // ดึงข้อมูลในวงเล็บ
+    if (sourceMatch && sourceMatch[1]) {
+        // หากเจอข้อมูลในวงเล็บ ให้นำมาใส่ในช่องจำนวน
+        document.getElementById("sort-sourceQty").value = sourceMatch[1];
+    } else {
+        // ถ้าไม่เจอ ให้ใส่ค่าว่าง เพื่อป้องกัน Error
+        document.getElementById("sort-sourceQty").value = "";
+    }
+    // --- ส่วนที่แก้ไข สิ้นสุด ---
+
+    // แสดงข้อมูลสินค้าต้นทาง และปิดปุ่มบางส่วน
+    document.getElementById("source-info").style.display = "block";
+    document.getElementById("sort-refDocId").readOnly = true;
+    document.getElementById("fetch-btn").disabled = true;
+
+    // ล้างรายการสินค้าที่คัดแยกแล้วของเก่าออก
+    sortingItemTableBody.innerHTML = "";
+
+    // วนลูปเพื่อเพิ่มรายการสินค้าที่คัดแยกแล้วเข้าไปในตาราง
+    // ใช้ (rec.items || []) เพื่อป้องกัน Error หากไม่มีข้อมูล items
+    (rec.items || []).forEach(itemString => {
+        // แยกชื่อและจำนวนของแต่ละรายการอย่างปลอดภัย
+        const parts = itemString.match(/(.*) \((\d+(\.\d+)?)\)/);
+        if (parts) { // ตรวจสอบว่า match ข้อมูลเจอหรือไม่ก่อนใช้งาน
+            addSortingItemRow({ name: parts[1], quantity: parts[2] });
+        }
+    });
+
+    // อัปเดตหัวข้อและปุ่มใน Modal
+    document.getElementById("sortingModalLabel").innerText = `แก้ไขเอกสาร: ${rec.docId}`;
+    sortSubmitBtn.innerText = "อัปเดตข้อมูล";
+
+    // แสดง Modal แก้ไข
+    sortingModal.show();
+}
+
+function deleteSortingRecord(docId) {
+    Swal.fire({
+        title: 'ยืนยันการลบ',
+        text: `คุณต้องการลบเอกสารคัดแยก ${docId} ใช่หรือไม่? สต็อกสินค้าจะถูกปรับคืนค่าเดิม`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            showLoader();
+            google.script.run.withSuccessHandler(res => {
+                hideLoader();
+                if (res.success) {
+                    showToast(res.message, 'success');
+                    loadSortingHistory();
+                } else {
+                    showToast(res.message, 'danger');
+                }
+            }).withFailureHandler(onFailure).deleteSortingByDocId(docId);
+        }
+    });
+}
+
+// =================================================== //
+// === 5. ระบบซ่อมบำรุง (Maintenance System) ======== //
+// =================================================== //
+function handleMaintenanceSubmit(e) {
+    e.preventDefault();
+    maSubmitBtn.disabled = true;
+    const formData = {
+        docId: document.getElementById('ma-docId').value,
+        date: document.getElementById('ma-date').value,
+        vehicleId: document.getElementById('ma-vehicleId').value,
+        mileage: document.getElementById('ma-mileage').value,
+        type: document.getElementById('ma-type').value,
+        details: document.getElementById('ma-details').value,
+        cost: document.getElementById('ma-cost').value
+    };
+    const serverFunc = formData.docId ? 'updateMaintenanceData' : 'saveMaintenanceData';
+    showLoader();
+    google.script.run.withSuccessHandler(res => {
+        hideLoader();
+        maSubmitBtn.disabled = false;
+        if (res.success) {
+            showToast(`บันทึกข้อมูล ${res.docId} สำเร็จ`, 'success');
+            maintenanceModal.hide();
+            resetMaintenanceForm();
+            loadMaintenanceHistory();
+        } else {
+            showToast(`เกิดข้อผิดพลาด: ${res.message}`, 'danger');
+        }
+    }).withFailureHandler(onFailure)[serverFunc](formData);
+}
+
+function openMaintenanceModal() {
+    resetMaintenanceForm();
+    document.getElementById("maintenanceModalLabel").innerText = "ฟอร์มบันทึกการซ่อมบำรุง";
+    maSubmitBtn.innerText = "บันทึกข้อมูล";
+    maintenanceModal.show();
+}
+
+function loadMaintenanceHistory() {
+    showLoader();
+    google.script.run.withSuccessHandler(data => {
+        hideLoader();
+        allMaintenanceData = data || [];
+        currentMaintenancePage = 1;
+        displayMaintenanceHistory();
+        populateMaintenanceDatalists();
+    }).withFailureHandler(onFailure).getMaintenanceHistory();
+}
+
+function displayMaintenanceHistory() {
+    const searchTerm = document.getElementById('maintenance-search').value.toLowerCase();
+    const filteredData = searchTerm
+        ? allMaintenanceData.filter(rec => rec.vehicleId.toLowerCase().includes(searchTerm))
+        : allMaintenanceData;
+    const body = document.getElementById("maintenanceHistoryTableBody");
+    body.innerHTML = "";
+    if (!filteredData || filteredData.length === 0) {
+        body.innerHTML = '<tr><td colspan="8" class="text-center">ไม่พบข้อมูล</td></tr>';
+        setupPagination('maintenance-pagination', 0, 1, ROWS_PER_PAGE, () => {});
+        return;
+    }
+    const paginatedData = filteredData.slice((currentMaintenancePage - 1) * ROWS_PER_PAGE, currentMaintenancePage * ROWS_PER_PAGE);
+    paginatedData.forEach(rec => {
+        const mileageFormatted = formatNumber(rec.mileage);
+        const costFormatted = formatCurrency(rec.cost);
+        const row = body.insertRow();
+        row.innerHTML = `
+                <td>${rec.docId}</td>
+                <td>${rec.date}</td>
+                <td>${rec.vehicleId}</td>
+                <td>${mileageFormatted}</td>
+                <td>${rec.type}</td>
+                <td>${rec.details}</td>
+                <td class="text-end">${costFormatted}</td>
+                <td class="text-end">
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-warning btn-sm" title="แก้ไข" onclick='editMaintenanceRecord(${JSON.stringify(rec)})'><i class="bi bi-pencil-fill"></i></button>
+                        <button class="btn btn-info btn-sm" title="พิมพ์" onclick='printRecord("Maintenance", ${JSON.stringify(rec)})'><i class="bi bi-printer-fill"></i></button>
+                        <button class="btn btn-danger btn-sm" title="ลบ" onclick='deleteMaintenanceRecord("${rec.docId}")'><i class="bi bi-trash-fill"></i></button>
+                    </div>
+                </td>`;
+    });
+    setupPagination('maintenance-pagination', filteredData.length, currentMaintenancePage, ROWS_PER_PAGE, page => {
+        currentMaintenancePage = page;
+        displayMaintenanceHistory();
+    });
+}
+
+function resetMaintenanceForm() {
+    maintenanceForm.reset();
+    document.getElementById("ma-docId").value = "";
+}
+
+function editMaintenanceRecord(rec) {
+    resetMaintenanceForm();
+    document.getElementById("ma-docId").value = rec.docId;
+    // Format date from DD/MM/YYYY(BE) to YYYY-MM-DD for input type="date"
+    const dateParts = rec.date.split('/');
+    if (dateParts.length === 3) {
+      document.getElementById("ma-date").value = `${dateParts[2]-543}-${dateParts[1].padStart(2, '0')}-${dateParts[0].padStart(2, '0')}`;
+    }
+    document.getElementById("ma-vehicleId").value = rec.vehicleId;
+    document.getElementById("ma-mileage").value = rec.mileage;
+    document.getElementById("ma-type").value = rec.type;
+    document.getElementById("ma-details").value = rec.details;
+    document.getElementById("ma-cost").value = rec.cost;
+    document.getElementById("maintenanceModalLabel").innerText = `แก้ไขข้อมูล: ${rec.docId}`;
+    maSubmitBtn.innerText = "อัปเดตข้อมูล";
+    maintenanceModal.show();
+}
+
+function deleteMaintenanceRecord(docId) {
+    Swal.fire({
+        title: 'ยืนยันการลบ',
+        text: `คุณต้องการลบข้อมูลการซ่อม ${docId} ใช่หรือไม่?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            showLoader();
+            google.script.run.withSuccessHandler(res => {
+                hideLoader();
+                if (res.success) {
+                    showToast(res.message, 'success');
+                    loadMaintenanceHistory();
+                } else {
+                    showToast(`เกิดข้อผิดพลาด: ${res.message}`, 'danger');
+                }
+            }).withFailureHandler(onFailure).deleteMaintenanceData(docId);
+        }
+    });
+}
+
+function populateMaintenanceDatalists() {
+    const vehicles = [...new Set(allMaintenanceData.map(item => item.vehicleId))];
+    const types = [...new Set(allMaintenanceData.map(item => item.type))];
+    const vehicleDatalist = document.getElementById('vehicle-options');
+    vehicleDatalist.innerHTML = vehicles.map(v => `<option value="${v}">`).join('');
+    const typeDatalist = document.getElementById('maintenance-type-options');
+    typeDatalist.innerHTML = types.map(t => `<option value="${t}">`).join('');
+}
+
+
+// =================================================== //
+// === 6. ฟังก์ชันที่ใช้ร่วมกัน (Shared & Utilities) === //
+// =================================================== //
+function showLoader() { document.getElementById('loading-overlay').style.display = 'flex'; }
+function hideLoader() { document.getElementById('loading-overlay').style.display = 'none'; }
+function showToast(message, level = 'success') { const container = document.getElementById('toast-container'); const toast = document.createElement('div'); toast.className = `toast-notification toast-${level}`; toast.textContent = message; container.appendChild(toast); setTimeout(() => { toast.classList.add('show'); }, 100); setTimeout(() => { toast.classList.remove('show'); toast.addEventListener('transitionend', () => toast.remove()); }, 4000); }
+function deleteItemRow(btn) { if (btn.closest("tbody").rows.length > 1) { btn.closest("tr").remove(); } else { showToast("ต้องมีรายการสินค้าอย่างน้อย 1 รายการ", "warning"); } }
+
+function onSaveSuccess(response, type) { 
+    const btnMap = { 
+        withdrawal: wdSubmitBtn, 
+        receipt: rcSubmitBtn, 
+        sorting: sortSubmitBtn 
+    };
+    const btn = btnMap[type];
+
+    if (response.success) { 
+        showToast(`บันทึกสำเร็จ! เลขเอกสาร: ${response.docId}`, "success"); 
+        if (type === 'withdrawal') { resetWithdrawalForm(); loadWithdrawalPage(1); } 
+        else if (type === 'receipt') { resetReceiptForm(); loadReceiptPageData(); } 
+        else if (type === 'sorting') { resetSortingForm(); loadSortingHistory(); } 
+    } else { 
+        showToast(response.message, "danger"); 
+    } 
+    if (btn) btn.disabled = false; 
+}
+
+function onFailure(error) { 
+    hideLoader(); 
+    showToast(`เกิดข้อผิดพลาด: ${error.message}`, "danger"); 
+    if(wdSubmitBtn) wdSubmitBtn.disabled = false; 
+    if(rcSubmitBtn) rcSubmitBtn.disabled = false; 
+    if(sortSubmitBtn) sortSubmitBtn.disabled = false; 
+    if(maSubmitBtn) maSubmitBtn.disabled = false;
+}
+
+function loadAllOptions() {
+    google.script.run.withSuccessHandler(data => {
+        productMasterList = data.products || [];
+        supplierMasterList = data.suppliers || [];
+        branchMasterList = data.branches || [];
+        allReturnContactsMasterList = data.allReturnContacts || [];
+        allSupplierData = data.contactBalances || []; // <-- [ เพิ่มบรรทัดนี้ ]
+        
+        populateProductDropdowns();
+        populateSupplierOptions(supplierMasterList); 
+        populateBranchOptions(branchMasterList);
+        populateReturnContactOptions(allReturnContactsMasterList);
+        populateDatalist("employee-options")(data.employees);
+
+    }).withFailureHandler(onFailure).getWebAppInitialData();
+}
+
+
+function populateReturnContactOptions(contacts) {
+    const list = document.getElementById("return-contact-options"); // เราจะสร้าง datalist นี้ใน HTML
+    if (!list) return;
+    list.innerHTML = "";
+    if (contacts) {
+        contacts.forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = `${c.name} (${c.type})`; // แสดงชื่อพร้อมประเภทในวงเล็บ
+            list.appendChild(opt);
+        });
+    }
+}
+
+function populateBranchOptions(branches) {
+    const list = document.getElementById("branch-options");
+    list.innerHTML = "";
+    if (branches) {
+        branches.forEach(b => {
+            const opt = document.createElement("option");
+            opt.value = b.name;
+            list.appendChild(opt);
+        });
+    }
+}
+
+function debounce(func, delay = 300) {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+            func.apply(this, args);
+        }, delay);
+    };
+}
+const debouncedCheckStock = debounce(checkStockRealtime, 400);
+
+function populateProductDropdowns() {
+    const list = document.getElementById("product-options");
+    list.innerHTML = "";
+    if (productMasterList) {
+        productMasterList.forEach(product => {
+            const opt = document.createElement("option");
+            opt.value = product.name;
+            list.appendChild(opt);
+        });
+    }
+}
+
+function handleProductSelection(inputElement) {
+    const selectedName = inputElement.value;
+    const currentRow = inputElement.closest('tr');
+    const product = productMasterList.find(p => p.name === selectedName);
+
+    if (product) {
+        currentRow.dataset.productId = product.id;
+    } else {
+        delete currentRow.dataset.productId;
+    }
+
+    if (inputElement.closest('#withdrawalItemTableBody')) {
+        const quantityInput = currentRow.querySelector('[name="quantity"]');
+        checkStockRealtime(quantityInput);
+    }
+}
+
+function populateDatalist(id) { return function(items) { const list = document.getElementById(id); list.innerHTML = ""; if (items) { items.forEach(item => { const opt = document.createElement("option"); opt.value = item; list.appendChild(opt); }); } } }
+
+function populateSupplierOptions(suppliers) {
+    const list = document.getElementById("supplier-options");
+    list.innerHTML = "";
+    if (suppliers) {
+        suppliers.forEach(s => {
+            const opt = document.createElement("option");
+            opt.value = s.name;
+            list.appendChild(opt);
+        });
+    }
+}
+
+
+
+
+function openNewSupplierModal() {
+    document.getElementById("newSupplierForm").reset();
+    newSupplierModal.show();
+}
+
+
+/**
+ * [IMPROVED] สร้าง Pagination แบบย่อที่สวยงามและใช้งานง่าย
+ * @param {string} containerId - ID ของ element ที่จะใส่ pagination
+ * @param {number} totalRows - จำนวนข้อมูลทั้งหมด
+ * @param {number} currentPage - หน้าปัจจุบัน
+ * @param {number} rowsPerPage - จำนวนข้อมูลต่อหน้า
+ * @param {function} onPageClick - ฟังก์ชันที่จะเรียกใช้เมื่อคลิกเปลี่ยนหน้า
+ */
+function setupPagination(containerId, totalRows, currentPage, rowsPerPage, onPageClick) {
+    const paginationContainer = document.getElementById(containerId);
+    paginationContainer.innerHTML = "";
+    if (totalRows <= rowsPerPage) return;
+
+    const totalPages = Math.ceil(totalRows / rowsPerPage);
+    const pageWindow = 2; // จำนวนหน้าที่จะแสดงก่อนและหลังหน้าปัจจุบัน
+
+    const createPageItem = (content, page, isDisabled = false, isActive = false, isEllipsis = false) => {
+        const li = document.createElement('li');
+        li.className = `page-item ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''} ${isEllipsis ? 'disabled' : ''}`;
+        
+        const a = document.createElement(isEllipsis ? 'span' : 'a');
+        a.className = 'page-link';
+        if (!isEllipsis) a.href = '#';
+        a.innerHTML = content;
+        
+        if (!isDisabled && !isEllipsis) {
+            a.onclick = (e) => {
+                e.preventDefault();
+                onPageClick(page);
+            };
+        }
+        li.appendChild(a);
+        return li;
+    };
+
+    // 1. ปุ่ม "ก่อนหน้า" (Previous)
+    paginationContainer.appendChild(createPageItem('&laquo;', currentPage - 1, currentPage === 1));
+
+    let lastPageRendered = 0;
+    const pagesToShow = [];
+
+    // 2. หาเลขหน้าทั้งหมดที่ต้องการแสดง
+    for (let i = 1; i <= totalPages; i++) {
+        // เงื่อนไข: แสดงหน้า 1, หน้าสุดท้าย, และหน้าที่อยู่ใน window รอบๆ หน้าปัจจุบัน
+        if (i === 1 || i === totalPages || (i >= currentPage - pageWindow && i <= currentPage + pageWindow)) {
+            pagesToShow.push(i);
+        }
+    }
+    
+    // 3. วนลูปเพื่อสร้างปุ่ม พร้อมใส่ "..." คั่นกลาง
+    const uniquePages = [...new Set(pagesToShow)]; // เอาเลขหน้าที่ซ้ำกันออก
+    for (const pageNum of uniquePages) {
+        // ถ้าเลขหน้าปัจจุบัน ห่างจากเลขหน้าที่แสดงไปล่าสุดมากกว่า 1 ให้ใส่ "..."
+        if (lastPageRendered > 0 && pageNum - lastPageRendered > 1) {
+            paginationContainer.appendChild(createPageItem('...', 0, false, false, true));
+        }
+        
+        paginationContainer.appendChild(createPageItem(pageNum, pageNum, false, pageNum === currentPage));
+        lastPageRendered = pageNum;
+    }
+
+    // 4. ปุ่ม "ถัดไป" (Next)
+    paginationContainer.appendChild(createPageItem('&raquo;', currentPage + 1, currentPage === totalPages));
+}
+
+// =================================================== //
+// === ระบบคลังสินค้า (Stock System) ================= //
+// =================================================== //
+function loadStockData() {
+    showLoader();
+    google.script.run.withSuccessHandler(res => { hideLoader(); displayStockData(res); }).withFailureHandler(onFailure).getStockData();
+}
+function displayStockData(response) {
+    const head = document.getElementById("stockTableHead");
+    const body = document.getElementById("stockTableBody");
+    head.innerHTML = ""; body.innerHTML = "";
+    if (response.error) {
+        body.innerHTML = `<tr><td colspan="10" class="text-center text-danger">เกิดข้อผิดพลาด: ${response.error}</td></tr>`;
+    } else if (response.data && response.data.length > 0) {
+        const headerRow = document.createElement('tr');
+        response.headers.forEach(headerText => { const th = document.createElement('th'); th.innerText = headerText; headerRow.appendChild(th); });
+        head.appendChild(headerRow);
+        response.data.forEach(rowData => {
+            const row = document.createElement('tr');
+            rowData.forEach(cellData => {
+                const td = document.createElement('td');
+                if (!isNaN(parseFloat(cellData)) && isFinite(cellData) && cellData.toString().trim() !== '') {
+                    td.innerText = formatNumber(cellData);
+                } else {
+                    td.innerText = cellData;
+                }
+                row.appendChild(td);
+            });
+            body.appendChild(row);
+        });
+    } else {
+        body.innerHTML = '<tr><td colspan="10" class="text-center">ไม่พบข้อมูลในชีต "คลัง"</td></tr>';
+    }
+}
+function checkStockRealtime(inputElement) {
+    const currentRow = inputElement.closest('tr');
+    const productName = currentRow.querySelector('[name="itemName"]').value;
+    const product = productMasterList.find(p => p.name === productName);
+    const productId = product ? product.id : null;
+    const quantityToWithdraw = Number(inputElement.value);
+    const statusMessage = currentRow.querySelector('.stock-status-message');
+
+    if (!productId || quantityToWithdraw <= 0) {
+        statusMessage.textContent = '';
+        return;
+    }
+
+    statusMessage.textContent = 'กำลังตรวจสอบสต็อก...';
+    statusMessage.className = 'form-text stock-status-message text-muted';
+
+    google.script.run.withSuccessHandler(availableStock => {
+        if (availableStock === null) {
+            statusMessage.textContent = `ไม่พบสินค้านี้ในคลัง`;
+            statusMessage.className = 'form-text stock-status-message text-danger';
+        } else if (Number(availableStock) < quantityToWithdraw) {
+            statusMessage.textContent = `ไม่พอ! มีในคลัง: ${formatNumber(availableStock)}`;
+            statusMessage.className = 'form-text stock-status-message text-danger';
+        } else {
+            statusMessage.textContent = `เบิกได้ (มี ${formatNumber(availableStock)})`;
+            statusMessage.className = 'form-text stock-status-message text-success';
+        }
+    }).withFailureHandler(err => {
+        statusMessage.textContent = `เกิดข้อผิดพลาดในการเช็คสต็อก`;
+        statusMessage.className = 'form-text stock-status-message text-danger';
+    }).getStockByProductId(productId);
+}
+
+// =================================================== //
+// === 7. ระบบพิมพ์เอกสาร (Printing System) =========== //
+// =================================================== //
+function getCheckButtonHtml(record, hasBeenChecked) { 
+    const btnClass = hasBeenChecked ? 'btn-primary' : 'btn-success'; 
+    const title = hasBeenChecked ? 'ดู/แก้ไขผลการสุ่มเช็ค' : 'สุ่มเช็คสินค้า';
+    return `<button class="btn ${btnClass} btn-sm" title="${title}" onclick='openRandomCheckModal(${JSON.stringify(record)})'><i class="bi bi-clipboard2-check"></i></button>`; 
+}
+
+function getPrintButtonHtml(type, record) { return `<button class="btn btn-info btn-sm" title="พิมพ์" onclick='printRecord("${type}", ${JSON.stringify(record)})'><i class="bi bi-printer-fill"></i></button>`; }
+
+function getEditButtonHtml(type, record) { return `<button class="btn btn-warning btn-sm" title="แก้ไข" onclick='edit${type}Record(${JSON.stringify(record)})'><i class="bi bi-pencil-fill"></i></button>`; }
+
+function getDeleteButtonHtml(funcName, docId) { return `<button class="btn btn-danger btn-sm" title="ลบ" onclick='${funcName}("${docId}")'><i class="bi bi-trash-fill"></i></button>`; }
+
+function printRecord(type, record) {
+    showLoader();
+    google.script.run.withSuccessHandler(docInfo => {
+        hideLoader();
+        let title, printContent;
+        if (type === 'Withdrawal') { title = "ใบเบิกสินค้า"; printContent = getWithdrawalPrintHtml(record, docInfo); }
+        else if (type === 'Receipt') { title = "ใบรับสินค้า"; printContent = getReceiptPrintHtml(record, docInfo); }
+        else if (type === 'Sorting') { title = "ใบคัดแยกสินค้า"; printContent = getSortingPrintHtml(record, docInfo); }
+        else if (type === 'Check') { title = "ใบรายงานผลการสุ่มตรวจ"; printContent = getCheckPrintHtml(record, docInfo); }
+        else if (type === 'Maintenance') { title = "ใบแจ้งซ่อมบำรุง"; printContent = getMaintenancePrintHtml(record, docInfo); }
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`<html><head><title>${title} - ${record.docId || record.checkId}</title>${getPrintStyles()}</head><body>${printContent}</body></html>`);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); }, 500);
+    }).withFailureHandler(onFailure).getDocumentInfo();
+}
+
+/**
+ * [FIXED] พิมพ์รายงานสต็อกโดยใช้ ID ตารางที่ถูกต้อง
+ */
+function printStock() {
+    // ++ แก้ไข ID ที่เรียกใช้จาก 'stockTableBody' เป็น 'product-management-table-body' ++
+    const tableBody = document.getElementById('product-management-table-body');
+    
+    if (!tableBody) {
+        Swal.fire('เกิดข้อผิดพลาด', 'ไม่พบตารางสินค้า (product-management-table-body)', 'error');
+        return;
+    }
+
+    if (!tableBody.hasChildNodes() || tableBody.querySelector('td[colspan]')) {
+        Swal.fire('ไม่มีข้อมูล', 'ไม่มีข้อมูลในคลังสินค้าสำหรับพิมพ์', 'info');
+        return;
+    }
+    
+    showLoader();
+    google.script.run.withSuccessHandler(docInfo => {
+        hideLoader();
+        // ++ แก้ไข getStockPrintHtml ให้ส่ง tableBody ไปด้วย ++
+        const printContent = getStockPrintHtml(docInfo, tableBody.parentElement);
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`<html><head><title>รายงานสินค้าคงคลัง</title>${getPrintStyles()}</head><body>${printContent}</body></html>`);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); }, 500);
+    }).withFailureHandler(onFailure).getDocumentInfo();
+}
+
+/**
+ * [REVISED] สร้าง HTML สำหรับพิมพ์สต็อกโดยรับ Element ของตารางเข้ามา
+ */
+function getStockPrintHtml(info, tableElement) {
+    // [ใหม่] 1. สร้างสำเนาของตารางขึ้นมาในหน่วยความจำ เพื่อไม่ให้กระทบกับตารางที่แสดงบนจอ
+    const tableClone = tableElement.cloneNode(true);
+
+    // [ใหม่] 2. ลบคอลัมน์สุดท้าย (จัดการ) ออกจากส่วนหัวของตารางสำเนา
+    const headerRowClone = tableClone.querySelector('thead tr');
+    if (headerRowClone && headerRowClone.lastElementChild) {
+        headerRowClone.removeChild(headerRowClone.lastElementChild);
+    }
+
+    // [ใหม่] 3. วนลูปเพื่อลบคอลัมน์สุดท้ายออกจากทุกแถวในส่วนเนื้อหาของตารางสำเนา
+    tableClone.querySelectorAll('tbody tr').forEach(row => {
+        if (row.lastElementChild) {
+            row.removeChild(row.lastElementChild);
+        }
+    });
+
+    // [ใหม่] 4. ดึงโค้ด HTML จากตารางสำเนาที่แก้ไขแล้ว
+    const tableHeadHtml = tableClone.querySelector('thead').innerHTML;
+    const tableBodyHtml = tableClone.querySelector('tbody').innerHTML;
+    const reportDate = new Date().toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'short' });
+    
+    return `<div class="page">
+            <div class="header">
+                <div class="company-details"><h2>${info.companyName || ""}</h2><p>${info.address1 || ""}</p><p>${info.address2 || ""}</p><p>${info.contactInfo || ""}</p></div>
+                <div class="doc-title-box"><h1>รายงานสินค้าคงคลัง</h1><p>ณ วันที่ ${reportDate}</p></div>
+            </div>
+            <table class="items-table"><thead>${tableHeadHtml}</thead><tbody>${tableBodyHtml}</tbody></table>
+        </div>`;
+}
+
+function getMaintenancePrintHtml(rec, info) {
+    const costFormatted = formatCurrency(rec.cost);
+    return `<div class="page">
+            <div class="header">
+                <div class="company-details"><h2>${info.companyName||""}</h2><p>${info.address1||""}</p><p>${info.address2||""}</p><p>${info.contactInfo||""}</p></div>
+                <div class="doc-title-box"><h1>ใบแจ้งซ่อมบำรุง</h1><p>${rec.docId}</p></div>
+            </div>
+            <div class="info-section">
+                <h3>ข้อมูลการซ่อม</h3>
+                <table>
+                    <tr><td style="width:20%"><strong>วันที่แจ้งซ่อม:</strong></td><td style="width:30%">${rec.date}</td><td style="width:20%"><strong>ทะเบียนรถ:</strong></td><td><strong>${rec.vehicleId}</strong></td></tr>
+                    <tr><td><strong>เลขไมล์ (กม.):</strong></td><td>${formatNumber(rec.mileage)}</td><td><strong>ประเภท:</strong></td><td>${rec.type}</td></tr>
+                </table>
+            </div>
+            <table class="items-table">
+                <thead><tr><th>รายละเอียดการซ่อม / อะไหล่ที่ใช้</th><th class="text-center" style="width: 25%">ค่าใช้จ่าย (บาท)</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td style="white-space: pre-wrap; vertical-align: top;">${rec.details || 'ไม่มีรายละเอียดเพิ่มเติม'}</td>
+                        <td class="text-center" style="vertical-align: top;">${costFormatted}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="footer">
+                <div class="signature-box"><div class="line"></div><p><strong>ผู้แจ้งซ่อม/ผู้ขับขี่</strong></p></div>
+                <div class="signature-box"><div class="line"></div><p><strong>ช่างผู้ตรวจสอบ/อนุมัติ</strong></p></div>
+            </div>
+        </div>`;
+}
+
+function getPrintStyles() {
+    return `
+        <style>
+            /* --- Import Font --- */
+            @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+            /* --- Basic Setup --- */
+            body {
+                font-family: 'Sarabun', 'Arial', sans-serif;
+                margin: 0;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+
+            .page {
+                width: 210mm;
+                padding: 20mm;
+                margin: auto;
+                box-sizing: border-box;
+            }
+
+            /* --- Header Section --- */
+            .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                padding-bottom: 15px;
+            }
+
+            .company-details h2 {
+                margin: 0;
+                font-size: 1.8em;
+            }
+
+            .doc-title-box {
+                background-color: #2c3e50 !important;
+                color: #fff;
+                padding: 15px 25px;
+                text-align: right;
+            }
+
+            .doc-title-box h1 {
+                margin: 0;
+                font-size: 2.2em;
+            }
+
+            .doc-title-box p {
+                margin: 5px 0 0 0;
+            }
+            
+            /* Variations for different document types */
+            .doc-title-box-receipt {
+                background-color: #198754 !important;
+            }
+
+            .doc-title-box-sorting {
+                background-color: #6f42c1 !important;
+            }
+
+
+            /* --- Info Section --- */
+            .info-section {
+                margin-top: 25px;
+                margin-bottom: 30px;
+                padding: 15px;
+                border: 1px solid #ddd;
+                font-size: .9em;
+            }
+
+            .info-section h3 {
+                margin: 0 0 10px 0;
+                padding-bottom: 5px;
+                border-bottom: 1px solid #eee;
+            }
+
+            .info-section table {
+                width: 100%;
+            }
+
+            .info-section td {
+                padding: 2px 5px;
+                vertical-align: top;
+            }
+
+            /* --- Items Table --- */
+            .items-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: .9em;
+                margin-top: 20px;
+            }
+
+            .items-table thead tr {
+                background-color: #2c3e50 !important;
+                color: #fff;
+            }
+
+            .items-table th,
+            .items-table td {
+                padding: 10px;
+                border: 1px solid #ddd;
+                text-align: left;
+            }
+
+            .items-table .text-center {
+                text-align: center;
+            }
+            
+            /* --- Sorting Layout --- */
+            .sorting-split {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 20px;
+            }
+
+            .sorting-split > div {
+                width: 48%;
+            }
+
+            .sorting-split h4 {
+                border-bottom: 1px solid #ccc;
+                padding-bottom: 5px;
+            }
+
+            /* --- Footer Section --- */
+            .footer {
+                margin-top: 60px;
+                padding-top: 40px;
+                display: flex;
+                justify-content: space-around;
+                text-align: center;
+                font-size: .9em;
+            }
+
+            .signature-box {
+                width: 40%;
+            }
+
+            .signature-box .line {
+                margin-top: 60px;
+                border-bottom: 1px solid #555;
+            }
+
+            .signature-box p {
+                margin: 5px 0 0 0;
+            }
+        </style>
+    `;
+}
+
+function getWithdrawalPrintHtml(rec, info) {
+    let itemsHtml = (rec.items || []).map((item, i) =>
+        `<tr>
+            <td class="text-center">${i + 1}</td>
+            <td>${item.name}</td>
+            <td class="text-center">${formatNumber(item.quantity)}</td>
+            <td class="text-center">${item.unit || ""}</td>
+            <td>${item.note || ""}</td>
+        </tr>`
+    ).join('');
+
+    // สร้างโครงสร้าง HTML ทั้งหมดของเอกสาร
+    return `
+        <div class="page">
+            <div class="header">
+                <div class="company-details">
+                    <h2>${info.companyName || ""}</h2>
+                    <p>${info.address1 || ""}</p>
+                    <p>${info.address2 || ""}</p>
+                    <p>${info.contactInfo || ""}</p>
+                </div>
+                <div class="doc-title-box">
+                    <h1>ใบเบิกสินค้า</h1>
+                    <p>${rec.docId}</p>
+                </div>
+            </div>
+            <div class="info-section">
+                <h3>ข้อมูลการเบิก</h3>
+                <table>
+                    <tr>
+                        <td style="width:15%"><strong>ผู้เบิก:</strong></td>
+                        <td style="width:50%">${rec.requester}</td>
+                        <td style="width:15%"><strong>วันที่:</strong></td>
+                        <td style="width:20%">${rec.date}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>สาขา:</strong></td>
+                        <td>${rec.department || ""}</td>
+                        <td><strong>ผู้อนุมัติ:</strong></td>
+                        <td>${rec.approver}</td>
+                    </tr>
+                </table>
+            </div>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th class="text-center" style="width:5%">#</th>
+                        <th>รายการ</th>
+                        <th class="text-center" style="width:10%">จำนวน</th>
+                        <th class="text-center" style="width:10%">หน่วย</th>
+                        <th>หมายเหตุ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${itemsHtml}
+                </tbody>
+            </table>
+            <div class="footer">
+                <div class="signature-box">
+                    <div class="line"></div>
+                    <p>( ${rec.requester} )</p>
+                    <p><strong>ผู้เบิก</strong></p>
+                </div>
+                <div class="signature-box">
+                    <div class="line"></div>
+                    <p>( ${rec.approver} )</p>
+                    <p><strong>ผู้อนุมัติ</strong></p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function getReceiptPrintHtml(rec, info) {
+    // สร้าง HTML สำหรับรายการสินค้าแต่ละแถว
+    let itemsHtml = (rec.items || []).map((item, i) =>
+        `<tr>
+            <td class="text-center">${i + 1}</td>
+            <td>${item.name}</td>
+            <td class="text-center">${formatNumber(item.quantity)}</td>
+            <td class="text-center">${item.unit || ""}</td>
+            <td>${item.note || ""}</td>
+        </tr>`
+    ).join('');
+
+    // สร้างโครงสร้าง HTML ทั้งหมดของเอกสาร
+    return `
+        <div class="page">
+            <div class="header">
+                <div class="company-details">
+                    <h2>${info.companyName || ""}</h2>
+                    <p>${info.address1 || ""}</p>
+                    <p>${info.address2 || ""}</p>
+                    <p>${info.contactInfo || ""}</p>
+                </div>
+                <div class="doc-title-box doc-title-box-receipt">
+                    <h1>ใบรับสินค้า</h1>
+                    <p>${rec.docId}</p>
+                </div>
+            </div>
+            <div class="info-section">
+                <h3>ข้อมูลการรับสินค้า</h3>
+                <table>
+                    <tr>
+                        <td style="width:20%"><strong>ซัพพลายเออร์:</strong></td>
+                        <td style="width:50%">${rec.supplier}</td>
+                        <td style="width:15%"><strong>วันที่:</strong></td>
+                        <td style="width:20%">${rec.date}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ผู้รับ:</strong></td>
+                        <td>${rec.receiver}</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </table>
+            </div>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th class="text-center" style="width:5%">#</th>
+                        <th>รายการ</th>
+                        <th class="text-center" style="width:10%">จำนวน</th>
+                        <th class="text-center" style="width:10%">หน่วย</th>
+                        <th>หมายเหตุ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${itemsHtml}
+                </tbody>
+            </table>
+            <div class="footer">
+                <div class="signature-box">
+                    <div class="line"></div>
+                    <p>( ........................ )</p>
+                    <p><strong>ซัพพลายเออร์</strong></p>
+                </div>
+                <div class="signature-box">
+                    <div class="line"></div>
+                    <p>( ${rec.receiver} )</p>
+                    <p><strong>ผู้รับสินค้า</strong></p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function getSortingPrintHtml(rec, info) {
+    // --- ส่วนที่แก้ไข ---
+    let itemsHtml = (rec.items || []).map((itemString, i) => {
+        const parts = itemString.match(/(.*) \((\d+(\.\d+)?)\)/);
+        let formattedItem = itemString; // ใช้ค่าเดิมไว้ก่อน
+        if (parts) {
+            // ถ้าแยกส่วนได้ ให้นำตัวเลขมาจัดรูปแบบแล้วประกอบกลับเข้าไปใหม่
+            formattedItem = `${parts[1]} (${formatNumber(parts[2])})`;
+        }
+        return `<tr><td class="text-center">${i + 1}</td><td>${formattedItem}</td></tr>`;
+    }).join('');
+    // --- สิ้นสุดการแก้ไข ---
+
+    const sourceMatch = rec.sourceItem.match(/\(([^)]+)\)/);
+    const sourceQty = sourceMatch ? formatNumber(sourceMatch[1]) : '0';
+    const sourceName = rec.sourceItem.split(' (')[0];
+
+    return `<div class="page">
+        <div class="header">
+            <div class="company-details"><h2>${info.companyName||""}</h2><p>${info.address1||""}</p><p>${info.address2||""}</p><p>${info.contactInfo||""}</p></div>
+            <div class="doc-title-box doc-title-box-sorting"><h1>ใบคัดแยกสินค้า</h1><p>${rec.docId}</p></div>
+        </div>
+        <div class="info-section">
+            <h3>ข้อมูลทั่วไป</h3>
+            <table>
+                <tr><td style="width:20%"><strong>วันที่คัดแยก:</strong></td><td>${rec.date}</td></tr>
+                <tr><td><strong>เอกสารอ้างอิง:</strong></td><td>${rec.refDocId}</td></tr>
+            </table>
+        </div>
+        <div class="sorting-split">
+            <div>
+                <h4>สินค้าต้นทาง</h4>
+                <table class="items-table">
+                    <thead><tr><th>รายการ</th><th class="text-center">จำนวน</th></tr></thead>
+                    <tbody><tr><td>${sourceName}</td><td class="text-center">${sourceQty}</td></tr></tbody>
+                </table>
+            </div>
+            <div>
+                <h4>ผลลัพธ์การคัดแยก</h4>
+                <table class="items-table">
+                    <thead><tr><th class="text-center" style="width:5%">#</th><th>รายการที่ได้</th></tr></thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+            </div>
+        </div>
+        <div class="footer">
+            <div class="signature-box"><div class="line"></div><p><strong>ผู้คัดแยก</strong></p></div>
+            <div class="signature-box"><div class="line"></div><p><strong>ผู้ตรวจสอบ</strong></p></div>
+        </div>
+    </div>`;
+}
+
+function getCheckPrintHtml(rec, info) {
+    return `<div class="page">
+            <div class="header">
+                <div class="company-details"><h2>${info.companyName||""}</h2><p>${info.address1||""}</p><p>${info.address2||""}</p><p>${info.contactInfo||""}</p></div>
+                <div class="doc-title-box"><h1>ใบรายงานผลการสุ่มตรวจ</h1><p>${rec.checkId}</p></div>
+            </div>
+            <div class="info-section">
+                <h3>ข้อมูลการตรวจสอบ</h3>
+                <table>
+                    <tr><td style="width:20%"><strong>วันที่ตรวจ:</strong></td><td style="width:30%">${rec.timestamp}</td><td style="width:20%"><strong>ผู้ตรวจ:</strong></td><td>${rec.checkerName}</td></tr>
+                    <tr><td><strong>เอกสารอ้างอิง:</strong></td><td colspan="3">${rec.refDocId}</td></tr>
+                    <tr><td><strong>รายการสินค้า:</strong></td><td colspan="3"><strong>${rec.itemName}</strong></td></tr>
+                </table>
+            </div>
+            <table class="items-table">
+                <thead><tr><th>รายการ</th><th class="text-center">ตามเอกสาร</th><th class="text-center">ตรวจนับจริง</th><th class="text-center">ผลต่าง</th></tr></thead>
+                <tbody>
+                    <tr><td>จำนวน</td><td class="text-center">${formatNumber(rec.docQuantity)}</td><td class="text-center">${formatNumber(rec.actualQuantity)}</td><td class="text-center">${formatNumber(rec.quantityDiff)}</td></tr>
+                    <tr><td>น้ำหนัก</td><td class="text-center">${formatNumber(rec.docWeight) || '-'}</td><td class="text-center">${formatNumber(rec.actualWeight) || '-'}</td><td class="text-center">${formatNumber(rec.weightDiff) || '-'}</td></tr>
+                </tbody>
+            </table>
+            <div class="info-section" style="margin-top: 20px;">
+                <h3>สรุปผลและหมายเหตุ</h3>
+                <p><strong>ผลการตรวจสอบ:</strong> ${rec.checkResult}</p>
+                <p><strong>หมายเหตุ:</strong> ${rec.notes || 'ไม่มี'}</p>
+            </div>
+            <div class="footer">
+                <div class="signature-box"><div class="line"></div><p>( ${rec.checkerName} )</p><p><strong>ผู้ตรวจสอบ</strong></p></div>
+                <div class="signature-box"><div class="line"></div><p>( ........................ )</p><p><strong>ผู้รับทราบ</strong></p></div>
+            </div>
+        </div>`;
+}
+
+// =================================================== //
+// === 8. ระบบประวัติการสุ่มเช็ค (Check History) ==== //
+// =================================================== //
+function loadCheckHistory() {
+    showLoader();
+    google.script.run.withSuccessHandler(data => {
+        hideLoader();
+        allCheckHistoryData = data || [];
+        currentCheckHistoryPage = 1;
+        displayCheckHistory();
+    }).withFailureHandler(onFailure).getCheckHistoryList();
+}
+function displayCheckHistory() {
+    const searchTerm = document.getElementById('check-history-search').value.toLowerCase();
+    const filteredData = searchTerm
+        ? allCheckHistoryData.filter(rec =>
+            rec.checkId.toLowerCase().includes(searchTerm) ||
+            rec.refDocId.toLowerCase().includes(searchTerm) ||
+            rec.itemName.toLowerCase().includes(searchTerm) ||
+            rec.checkerName.toLowerCase().includes(searchTerm)
+          )
+        : allCheckHistoryData;
+    const body = document.getElementById("checkHistoryTableBody");
+    body.innerHTML = "";
+    if (!filteredData || filteredData.length === 0) {
+        body.innerHTML = '<tr><td colspan="7" class="text-center">ไม่พบข้อมูล</td></tr>';
+        setupPagination('check-history-pagination', 0, 1, ROWS_PER_PAGE, () => {});
+        return;
+    }
+    const paginatedData = filteredData.slice((currentCheckHistoryPage - 1) * ROWS_PER_PAGE, currentCheckHistoryPage * ROWS_PER_PAGE);
+    paginatedData.forEach(rec => {
+        const row = body.insertRow();
+        const resultClass = rec.checkResult === 'ผ่าน' ? 'text-success' : 'text-danger';
+        row.innerHTML = `
+                <td>${rec.checkId}</td>
+                <td>${rec.timestamp}</td>
+                <td>${rec.refDocId}</td>
+                <td>${rec.itemName}</td>
+                <td><b class="${resultClass}">${rec.checkResult}</b></td>
+                <td>${rec.checkerName}</td>
+                <td class="text-end">
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-info btn-sm" title="พิมพ์" onclick='printRecord("Check", ${JSON.stringify(rec)})'><i class="bi bi-printer-fill"></i></button>
+                        <button class="btn btn-danger btn-sm" title="ลบ" onclick='handleDeleteCheckFromHistory("${rec.checkId}")'><i class="bi bi-trash-fill"></i></button>
+                    </div>
+                </td>`;
+    });
+    setupPagination('check-history-pagination', filteredData.length, currentCheckHistoryPage, ROWS_PER_PAGE, page => {
+        currentCheckHistoryPage = page;
+        displayCheckHistory();
+    });
+}
+
+function handleDeleteCheckFromHistory(checkId) {
+    Swal.fire({
+        title: 'ยืนยันการลบ',
+        text: `คุณต้องการลบข้อมูลการสุ่มเช็ค ID: ${checkId} ใช่หรือไม่?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            showLoader();
+            google.script.run.withSuccessHandler(res => {
+                hideLoader();
+                if (res.success) {
+                    showToast(res.message, 'success');
+                    loadCheckHistory();
+                    loadReceiptPageData();
+                } else {
+                    showToast(`เกิดข้อผิดพลาด: ${res.message}`, 'danger');
+                }
+            }).withFailureHandler(onFailure).deleteRandomCheckData(checkId);
+        }
+    });
+}
+
+// =================================================== //
+// === 9. ระบบสุ่มเช็ค (Random Check System) =========== //
+// =================================================== //
+function openRandomCheckModal(record) {
+    if (!randomCheckForm) {
+        console.error("randomCheckForm is not initialized.");
+        showToast("เกิดข้อผิดพลาด: ไม่สามารถเปิดฟอร์มได้", "danger");
+        return;
+    }
+    randomCheckForm.reset();
+    
+    document.getElementById('randomCheckModalLabel').innerHTML = `<i class="bi bi-clipboard2-check"></i> สุ่มเช็คคุณภาพสินค้า`;
+    document.getElementById('check-refDocId').value = record.docId;
+    document.getElementById('check-refDocId-display').value = record.docId;
+    const tableBody = document.getElementById('check-items-table-body');
+    tableBody.innerHTML = ''; 
+
+    const existingChecks = allCheckData[record.docId] || [];
+
+    record.items.forEach((item, index) => {
+        const row = tableBody.insertRow();
+        row.dataset.itemName = item.name;
+        row.dataset.docQuantity = item.quantity;
+        row.dataset.docWeight = item.weight || '';
+        
+        const quantityFormatted = formatNumber(item.quantity);
+        
+        row.innerHTML = `
+            <td>${item.name}<br><small class="text-muted">ตามเอกสาร: ${quantityFormatted} ${item.unit || ''}</small></td>
+            <td><input type="number" step="any" class="form-control" name="actualQuantity"></td>
+            <td><input type="number" step="any" class="form-control" name="actualWeight"></td>
+            <td>
+                <select class="form-select" name="checkResult">
+                    <option value="ผ่าน">✅ ผ่าน</option>
+                    <option value="ไม่ผ่าน">❌ ไม่ผ่าน</option>
+                    <option value="ต้องตรวจสอบเพิ่มเติม">⚠️ เพิ่มเติม</option>
+                </select>
+            </td>
+            <td><input type="text" class="form-control" name="notes"></td>
+        `;
+        
+        const oldCheck = existingChecks.find(c => c.itemName === item.name && Number(c.docQuantity) === Number(item.quantity));
+        if (oldCheck) {
+            row.querySelector('[name="actualQuantity"]').value = oldCheck.actualQuantity;
+            row.querySelector('[name="actualWeight"]').value = oldCheck.actualWeight;
+            row.querySelector('[name="checkResult"]').value = oldCheck.checkResult;
+            row.querySelector('[name="notes"]').value = oldCheck.notes;
+        }
+    });
+    
+    const hasOldData = existingChecks.length > 0;
+    if(hasOldData){
+        document.getElementById('check-checkerName').value = existingChecks[0].checkerName;
+    }
+    
+    document.getElementById('check-submit-btn').textContent = hasOldData ? 'อัปเดตข้อมูล' : 'บันทึกผล';
+
+    randomCheckModal.show();
+}
+
+function handleRandomCheckSubmit(e) {
+    e.preventDefault();
+    
+    const itemsToCheck = [];
+    const tableRows = document.querySelectorAll("#check-items-table-body tr");
+
+    tableRows.forEach(row => {
+        itemsToCheck.push({
+            itemName: row.dataset.itemName,
+            docQuantity: row.dataset.docQuantity,
+            docWeight: row.dataset.docWeight,
+            actualQuantity: row.querySelector('[name="actualQuantity"]').value,
+            actualWeight: row.querySelector('[name="actualWeight"]').value,
+            checkResult: row.querySelector('[name="checkResult"]').value,
+            notes: row.querySelector('[name="notes"]').value,
+        });
+    });
+
+    const formData = {
+        refDocId: document.getElementById('check-refDocId').value,
+        checkerName: document.getElementById('check-checkerName').value,
+        items: itemsToCheck
+    };
+
+    showLoader();
+    google.script.run.withSuccessHandler(onUpdateSuccess).withFailureHandler(onFailure).saveOrUpdateCheckData(formData);
+}
+
+function onUpdateSuccess(res) {
+    hideLoader();
+    if (res.success) {
+        showToast(`ดำเนินการสำเร็จ!`, 'success');
+        randomCheckModal.hide();
+        loadReceiptPageData();
+        loadCheckHistory();
+    } else {
+        showToast(`เกิดข้อผิดพลาด: ${res.message}`, 'danger');
+    }
+}
+
+// =================================================== //
+// === 10. ระบบ Cache (Cache System) ================ //
+// =================================================== //
+
+
+/**
+ * [REVISED] เปิด Modal แสดงรายละเอียดการคัดแยก (เพิ่มการจัดรูปแบบตัวเลข)
+ * @param {object} record - ข้อมูลการคัดแยก
+ */
+function openSortingDetailsModal(record) {
+    const modalTitle = document.getElementById('receipt-details-title');
+    const modalBody = document.getElementById('receipt-details-body');
+    
+    modalTitle.innerText = `รายละเอียดการคัดแยก: ${record.docId}`;
+    
+    // --- ส่วนที่แก้ไข เริ่มต้น ---
+
+    // 1. จัดรูปแบบ "สินค้าต้นทาง"
+    let sourceItemHtml = record.sourceItem;
+    const sourceParts = record.sourceItem.match(/(.*) \((\d+(\.\d+)?)\)/);
+    if (sourceParts) {
+        // sourceParts[1] คือ ชื่อสินค้า, sourceParts[2] คือ ตัวเลข
+        sourceItemHtml = `${sourceParts[1]} (${formatNumber(sourceParts[2])})`;
+    }
+
+    let contentHtml = `
+        <h6 class="text-primary">สินค้าต้นทาง</h6>
+        <p class="ps-3">${sourceItemHtml}</p>
+        <hr>
+        <h6 class="text-success">ผลลัพธ์การคัดแยก</h6>
+        <ul class="list-group list-group-flush">
+    `;
+    
+    // 2. จัดรูปแบบ "ผลลัพธ์การคัดแยก"
+    (record.items || []).forEach(item => {
+        let formattedItem = item;
+        const itemParts = item.match(/(.*) \((\d+(\.\d+)?)\)/);
+        if (itemParts) {
+            formattedItem = `${itemParts[1]} (${formatNumber(itemParts[2])})`;
+        }
+        contentHtml += `<li class="list-group-item">${formattedItem}</li>`;
+    });
+    
+    contentHtml += '</ul>';
+
+    // --- ส่วนที่แก้ไข สิ้นสุด ---
+
+    modalBody.innerHTML = `<tr><td colspan="5">${contentHtml}</td></tr>`;
+    
+    receiptDetailsModal.show();
+}
+
+/**
+ * [NEW] สร้างชุดปุ่ม "จัดการ" (แก้ไข, พิมพ์, ลบ) ให้เป็นมาตรฐานเดียวกัน
+ * @param {string} type - ประเภทของเอกสาร (เช่น 'Withdrawal', 'Receipt')
+ * @param {object} record - ข้อมูลของแถวนั้นๆ (rec)
+ * @returns {string} - HTML ของ div ที่ครอบปุ่มทั้งหมด
+ */
+function getActionButtonsHtml(type, record) {
+    const docId = record.docId;
+    const editFunc = `edit${type}Record(${JSON.stringify(record)})`;
+    const printFunc = `printRecord('${type}', ${JSON.stringify(record)})`;
+    const deleteFunc = `delete${type}Record('${docId}')`;
+
+    // สร้างปุ่มตามลำดับ: แก้ไข (เหลือง), พิมพ์ (ฟ้า), ลบ (แดง)
+    const editButton = `<button class="btn btn-warning btn-sm" title="แก้ไข" onclick="${editFunc}"><i class="bi bi-pencil-fill"></i></button>`;
+    const printButton = `<button class="btn btn-info btn-sm" title="พิมพ์" onclick="${printFunc}"><i class="bi bi-printer-fill"></i></button>`;
+    const deleteButton = `<button class="btn btn-danger btn-sm" title="ลบ" onclick="${deleteFunc}"><i class="bi bi-trash-fill"></i></button>`;
+
+    // สำหรับหน้า Receipt จะมีปุ่ม Check เพิ่มเข้ามา
+    if (type === 'Receipt') {
+        const hasBeenChecked = allCheckData[docId] && allCheckData[docId].length > 0;
+        const checkButton = getCheckButtonHtml(record, hasBeenChecked);
+        return `<div class="btn-group btn-group-sm">${checkButton}${editButton}${printButton}${deleteButton}</div>`;
+    }
+
+    return `<div class="btn-group btn-group-sm">${editButton}${printButton}${deleteButton}</div>`;
+}
+
+/**
+ * [NEW] ฟังก์ชันสำหรับจัดรูปแบบตัวเลขให้มีคอมม่า
+ * @param {*} value - ค่าที่ต้องการจัดรูปแบบ
+ * @returns {string} - สตริงตัวเลขที่มีคอมม่า หรือค่าเดิมถ้าไม่ใช่ตัวเลข
+ */
+function formatNumber(value) {
+    if (value === null || value === undefined || value === '') return '';
+    const num = Number(value);
+    if (isNaN(num)) return value;
+    return num.toLocaleString('th-TH');
+}
+
+/**
+ * [NEW] ฟังก์ชันสำหรับจัดรูปแบบตัวเลขทศนิยม (สำหรับราคา)
+ * @param {*} value - ค่าที่ต้องการจัดรูปแบบ
+ * @returns {string} - สตริงตัวเลขที่มีคอมม่าและทศนิยม 2 ตำแหน่ง
+ */
+function formatCurrency(value) {
+    if (value === null || value === undefined || value === '') return '';
+    const num = Number(value);
+    if (isNaN(num)) return value;
+    return num.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+
+
+function openNewContactModal() {
+    document.getElementById("newContactForm").reset();
+    document.getElementById('branch-id-group').style.display = 'none'; // ++ เพิ่มบรรทัดนี้ ++
+    newContactModal.show();
+}
+
+function handleNewContactSubmit(e) {
+    e.preventDefault();
+    
+    const formData = {
+        name: document.getElementById("new-contact-name").value,
+        tel: document.getElementById("new-contact-tel").value,
+        type: document.getElementById("new-contact-type").value,
+        contactId: document.getElementById("new-contact-id").value // อ่านค่าจากช่องกรอกรหัสสาขา
+    };
+
+    if (!formData.type) {
+        showToast("กรุณาเลือกประเภทผู้ติดต่อ", "warning");
+        return;
+    }
+
+    // ตรวจสอบว่ากรอกรหัสสาขาหรือไม่ ถ้าเลือกประเภทเป็น Branch
+    if (formData.type === 'Branch' && !formData.contactId.trim()) {
+        showToast("กรุณากรอกรหัสสาขา", "warning");
+        return;
+    }
+
+    showLoader();
+    google.script.run.withSuccessHandler(res => {
+        hideLoader();
+        if (res.success) {
+            showToast(res.message, 'success');
+            newContactModal.hide();
+            loadAllOptions(); // โหลดข้อมูล Dropdown ใหม่ทั้งหมด
+            if (document.getElementById('suppliers-section').classList.contains('active')) {
+              loadSupplierDashboard(); // โหลดหน้าแดชบอร์ดใหม่ถ้าเปิดอยู่
+            }
+        } else {
+            showToast(res.message, 'danger');
+        }
+    }).withFailureHandler(onFailure).addNewContact(formData);
+}
+
+// =================================================== //
+// === [NEW] ระบบจัดการสินค้า (Product Management) ==== //
+// =================================================== //
+
+function openAddProductModal() {
+  document.getElementById('addProductForm').reset();
+  addProductModal.show();
+}
+
+function handleAddProductSubmit(e) {
+  e.preventDefault();
+  
+  const productData = {
+    productCode: document.getElementById('new-product-code').value,
+    productName: document.getElementById('new-product-name').value,
+    category: document.getElementById('new-product-category').value,
+  };
+
+  if (!productData.productCode || !productData.productName || !productData.category) {
+    showToast('กรุณากรอกข้อมูลให้ครบทุกช่อง', 'warning');
+    return;
+  }
+
+  showLoader();
+  google.script.run
+    .withSuccessHandler(res => {
+      hideLoader();
+      if (res.success) {
+        showToast(res.message, 'success');
+        addProductModal.hide();
+        loadProductManagementData(); // โหลดตารางสินค้าใหม่
+        loadAllOptions(); // โหลด Dropdown ใหม่ทั้งหมด
+      } else {
+        showToast(res.message, 'danger');
+      }
+    })
+    .withFailureHandler(onFailure)
+    .addNewProduct(productData);
+}
+
+function loadProductManagementData() {
+  showLoader();
+  google.script.run
+    .withSuccessHandler(response => {
+      hideLoader();
+      if(response.error){
+        onFailure({ message: response.error });
+        return;
+      }
+      // เก็บข้อมูลลงตัวแปร Global
+      allProductManagementHeaders = response.headers;
+      allProductManagementData = response.data;
+      displayProductManagementTable(); // เรียกใช้โดยไม่ต้องส่งค่า
+    })
+    .withFailureHandler(onFailure)
+    .getProductsWithDetails();
+}
+
+// ฟังก์ชันแสดงผล (เวอร์ชันอัปเกรดล่าสุด)
+function displayProductManagementTable() {
+  const tableHead = document.querySelector('#product-management-table thead');
+  const tableBody = document.getElementById('product-management-table-body');
+  const searchTerm = document.getElementById('product-management-search').value.toLowerCase();
+  
+  // ++ [แก้ไข] ดึงข้อมูลจากตัวแปร Global ++
+  const headers = allProductManagementHeaders;
+  const data = allProductManagementData;
+
+  // ++ [เพิ่มเข้ามา] ป้องกันไม่ให้ฟังก์ชันทำงานถ้าข้อมูลหลักยังไม่ถูกโหลด ++
+  if (!headers || headers.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="10" class="text-center">กำลังโหลดข้อมูล...</td></tr>`;
+      return;
+  }
+
+  tableHead.innerHTML = "";
+  tableBody.innerHTML = "";
+
+  // 1. สร้างหัวตารางแบบ Dynamic
+  const headerRow = tableHead.insertRow();
+  headers.forEach(headerText => {
+    const th = document.createElement('th');
+    th.textContent = headerText;
+    // จัดคอลัมน์ที่เป็นตัวเลขชิดขวา
+    if(headerText.includes('คลัง') || headerText.includes('จำนวน')){
+      th.className = 'text-end';
+    }
+    headerRow.appendChild(th);
+  });
+  // เพิ่มหัวข้อ "จัดการ" เป็นอันสุดท้าย
+  const thAction = document.createElement('th');
+  thAction.textContent = 'จัดการ';
+  thAction.className = 'text-end';
+  headerRow.appendChild(thAction);
+
+  // 2. กรองข้อมูล
+  const productCodeKey = "รหัสสินค้า";
+  const productNameKey = "ชื่อสินค้า";
+  const categoryKey = "หมวดหมู่";
+
+  const filteredData = searchTerm
+    ? data.filter(p => 
+        (p[productCodeKey]?.toString().toLowerCase() || '').includes(searchTerm) ||
+        (p[productNameKey]?.toString().toLowerCase() || '').includes(searchTerm) ||
+        (p[categoryKey]?.toString().toLowerCase() || '').includes(searchTerm)
+      )
+    : data;
+
+  if (filteredData.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="${headers.length + 1}" class="text-center">ไม่พบข้อมูลสินค้า</td></tr>`;
+    return;
+  }
+
+  // 3. สร้างแถวข้อมูล
+  filteredData.forEach(p => {
+    const row = tableBody.insertRow();
+    
+    headers.forEach(header => {
+      const cell = row.insertCell();
+      const cellData = p[header];
+      // ตรวจสอบว่าเป็นตัวเลขหรือไม่เพื่อจัดรูปแบบและตำแหน่ง
+      if (!isNaN(parseFloat(cellData)) && isFinite(cellData) && cellData.toString().trim() !== '') {
+        cell.innerText = formatNumber(cellData);
+        cell.className = 'text-end';
+      } else {
+        cell.innerText = cellData;
+      }
+    });
+
+    // 4. สร้าง Cell สุดท้ายสำหรับปุ่ม "จัดการ"
+    const actionCell = row.insertCell();
+    actionCell.className = 'text-end text-nowrap'; // เพิ่ม text-nowrap ไม่ให้ปุ่มตกบรรทัด
+
+    const stockQty = Number(p["คลังกลาง/ฟอง"] || 0);
+    const isDeletable = stockQty === 0;
+    
+    const editButton = `<button class="btn btn-warning btn-sm" onclick='openEditProductModal(${JSON.stringify(p)})'><i class="bi bi-pencil-fill"></i></button>`;
+    const deleteButton = `<button class="btn btn-danger btn-sm" onclick="handleDeleteProduct('${p[productCodeKey]}', '${p[productNameKey]}')" ${!isDeletable ? 'disabled' : ''} title="${isDeletable ? 'ลบ' : 'ไม่สามารถลบได้ (ยังมีสต็อก)'}"><i class="bi bi-trash-fill"></i></button>`;
+
+    actionCell.innerHTML = `<div class="btn-group btn-group-sm">${editButton}${deleteButton}</div>`;
+  });
+}
+
+function handleDeleteProduct(productCode, productName) {
+    Swal.fire({
+        title: 'ยืนยันการลบสินค้า',
+        html: `คุณต้องการลบสินค้า <b>"${productName}"</b><br>(รหัส: ${productCode}) ใช่หรือไม่?`, // ใช้ html เพื่อให้แสดงผลสวยขึ้น
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            showLoader();
+            google.script.run
+                .withSuccessHandler(response => {
+                    hideLoader();
+                    if (response.success) {
+                        showToast(response.message, 'success');
+                        loadProductManagementData();
+                    } else {
+                        showToast(response.message, 'danger');
+                    }
+                })
+                .withFailureHandler(onFailure)
+                .deleteProduct(productCode);
+        }
+    });
+}
+function openEditProductModal(product) {
+  // แก้ไขการเข้าถึงข้อมูลให้ใช้ Key ภาษาไทย
+  document.getElementById('edit-product-code').value = product["รหัสสินค้า"];
+  document.getElementById('edit-product-name').value = product["ชื่อสินค้า"];
+  document.getElementById('edit-product-category').value = product["หมวดหมู่"];
+ 
+  editProductModal.show();
+}
+
+function handleEditProductSubmit(e) {
+  e.preventDefault();
+
+  const productData = {
+    productCode: document.getElementById('edit-product-code').value,
+    productName: document.getElementById('edit-product-name').value,
+    category: document.getElementById('edit-product-category').value,
+  };
+
+  showLoader();
+  google.script.run
+    .withSuccessHandler(res => {
+      hideLoader();
+      if (res.success) {
+        showToast(res.message, 'success');
+        editProductModal.hide();
+        loadProductManagementData(); // โหลดตารางสินค้าใหม่
+        loadAllOptions(); // โหลด Dropdown ใหม่ทั้งหมด
+      } else {
+        showToast(res.message, 'danger');
+      }
+    })
+    .withFailureHandler(onFailure)
+    .updateProductDetails(productData);
+}
+
+</script>
