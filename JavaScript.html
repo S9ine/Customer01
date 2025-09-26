@@ -1521,9 +1521,8 @@ function printRecord(type, record) {
         printWindow.document.close();
         printWindow.focus();
         setTimeout(() => { printWindow.print(); }, 500);
-    }).withFailureHandler(onFailure).getDocumentInfo();
+    }).withFailureHandler(onFailure).getAppSettings(); // <-- แก้ไขบรรทัดนี้
 }
-
 /**
  * [FIXED] พิมพ์รายงานสต็อกโดยใช้ ID ตารางที่ถูกต้อง
  */
