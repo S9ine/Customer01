@@ -11,252 +11,303 @@
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
     
     <style>
+        :root {
+            --body-bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --border-color: #dee2e6;
+            --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+            --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+
         body { 
             font-family: 'Sarabun', sans-serif; 
-            background-color: #f4f7f6; 
+            background-color: var(--body-bg);
+            padding-top: 150px; /* เพิ่มพื้นที่ด้านบนสำหรับ Sticky Header */
         }
+        
         .main-container { 
-            max-width: 1100px; 
-            margin: 2rem auto; 
-            width: 100%; 
-            padding: 0 1rem; 
-            box-sizing: border-box; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 1rem;
         }
-        .feature-card { 
-            background-color: white; 
-            border-radius: 1rem; 
-            border: 1px solid #e9ecef; 
-            padding: 1.5rem; 
-            text-align: center; 
-            transition: all 0.2s ease-in-out; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.04); 
 
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeInUp 0.5s ease-out forwards;
+        /* --- Sticky Header --- */
+        .sticky-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030;
+            padding: 1rem;
+            background-color: rgba(248, 249, 250, 0.85); /* สีพื้นหลังโปร่งแสง */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .sticky-header .card {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        /* --- Redesigned Feature Cards --- */
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .feature-card { 
+            background-color: var(--card-bg); 
+            border-radius: 1rem; 
+            border: 1px solid var(--border-color); 
+            padding: 1.5rem; 
+            transition: all 0.3s ease-in-out; 
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+            color: var(--text-primary);
         }
         .feature-card:hover { 
-            transform: translateY(-5px); 
-            box-shadow: 0 12px 16px rgba(0,0,0,0.08); 
+            transform: translateY(-8px); 
+            box-shadow: var(--shadow); 
+            color: var(--text-primary);
         }
+
+        .feature-card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
         .feature-card .icon-circle { 
-            width: 60px; 
-            height: 60px;   
+            width: 48px; 
+            height: 48px;   
             border-radius: 50%; 
             display: flex; 
             align-items: center; 
             justify-content: center; 
-            margin: 0 auto 1rem; 
-            font-size: 1.75rem; 
+            font-size: 1.5rem; 
+            margin-right: 1rem;
+            flex-shrink: 0;
         }
-        .feature-card h5 { 
+        .feature-card-header h5 { 
             font-weight: 700; 
-            margin-bottom: 0.5rem; 
+            margin-bottom: 0; 
         }
+
         .feature-card p { 
-            font-size: 0.85rem; 
-            color: #6c757d; 
-            margin-bottom: 1.5rem; 
-            min-height: 40px; 
+            font-size: 0.9rem; 
+            color: var(--text-secondary); 
+            margin-bottom: 0;
+            flex-grow: 1; /* ทำให้ p ขยายเต็มพื้นที่ที่เหลือ */
         }
-        .feature-card .btn-link { 
-            text-decoration: none; 
-            font-weight: 500; 
-            padding: 0.5rem 1rem; 
-            border-radius: 50px; 
-            transition: all 0.2s ease-in-out; 
+        
+        .feature-card-footer {
+            margin-top: 1.5rem;
+            text-align: right;
         }
-        .c-blue { background-color: #EBF2FE; color: #2775EC; }
-        .c-green { background-color: #E6F8F2; color: #00A971; }
-        .c-purple { background-color: #F1F0FD; color: #6E62E5; }
-        .c-yellow { background-color: #FEF7E6; color: #F0B413; }
-        .c-red { background-color: #FDE8E8; color: #E23838; }
-        .settings-button { 
-            position: fixed; 
-            top: 1rem; 
-            right: 1rem; 
-            z-index: 1030; 
-            border-radius: 50%; 
-            width: 40px; 
-            height: 40px; 
-            padding: 0; 
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+
+        .arrow-icon {
+            font-size: 1.2rem;
+            transition: transform 0.2s ease-in-out;
         }
+        .feature-card:hover .arrow-icon {
+            transform: translateX(5px);
+        }
+
+        /* --- Color Palette for Icons --- */
+        .c-blue { background-color: #e7f5ff; color: #1d9bf0; }
+        .c-green { background-color: #e0f8e9; color: #00ba7c; }
+        .c-purple { background-color: #f3e8ff; color: #7857ff; }
+        .c-yellow { background-color: #fff8e1; color: #ffab00; }
+        .c-red { background-color: #fff0f0; color: #ff5a5f; }
+        .c-teal { background-color: #e0f2f1; color: #009688; }
+        .c-sky { background-color: #e1f5fe; color: #03a9f4; }
+        
+        /* --- Loading Animation --- */
         #loading-overlay {
-            display: none; 
-            position: fixed;
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            z-index: 9999;
-            display: flex; 
-            justify-content: center; 
-            align-items: center;
+            display: none; position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
             background-color: rgba(255, 255, 255, 0.7);
             backdrop-filter: blur(5px); 
         }
-        .egg-loader { 
-            width: 80px; 
-            height: 80px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-        }
+        .egg-loader { width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; }
         .egg {
-            width: 50px; 
-            height: 65px; 
-            background-color: #fad6b7;
+            width: 50px; height: 65px; background-color: #fad6b7;
             border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
             animation: wobble 1.5s ease-in-out infinite;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             border: 2px solid #e69963;
         }
-        @keyframes wobble {
-            0%, 100% { transform: translateX(0%) rotate(0deg); } 
-            15% { transform: translateX(-15%) rotate(-5deg); }
-            30% { transform: translateX(10%) rotate(3deg); } 
-            45% { transform: translateX(-8%) rotate(-3deg); }
-            60% { transform: translateX(5%) rotate(2deg); } 
-            75% { transform: translateX(-2%) rotate(-1deg); }
-        }
-        .vr {
-            opacity: 0.25;
-        }
-
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-                }
-                }
+        @keyframes wobble { 0%, 100% { transform: rotate(0deg); } 15% { transform: rotate(-5deg); } 30% { transform: rotate(3deg); } 45% { transform: rotate(-3deg); } 60% { transform: rotate(2deg); } 75% { transform: rotate(-1deg); } }
     </style>
 </head>
 <body>
-    <button class="btn btn-light settings-button" onclick="openSettings()">
-        <i class="bi bi-gear-fill"></i>
-    </button>
-
     <div id="loading-overlay" style="display: none;">
-        <div class="egg-loader">
-            <div class="egg"></div>
-        </div>
+        <div class="egg-loader"><div class="egg"></div></div>
     </div>
 
-    <div class="main-container">
-        <div class="card shadow-sm mb-4">
-            <div class="card-body p-4">
+    <header class="sticky-header">
+         <div class="card shadow-sm">
+            <div class="card-body p-3 p-md-4">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div>
                         <h2 class="h4 fw-bold mb-1">ภาพรวมคลังสินค้า 📊</h2>
-                        <p class="text-muted mb-0" id="dashboard-date">กำลังโหลดวันที่...</p>
+                        <p class="text-muted mb-0 small" id="dashboard-date">กำลังโหลดวันที่...</p>
                     </div>
-                    <div class="d-flex gap-3">
-                        <div class="d-flex align-items-center">
-                            <div class="fs-2 text-primary me-3"><i class="bi bi-box-seam"></i></div>
-                            <div>
-                                <h4 class="fw-bold mb-0" id="total-products">...</h4>
-                                <small class="text-muted">สินค้าทั้งหมด</small>
-                            </div>
+                    <div class="d-flex align-items-center gap-3 gap-md-4">
+                        <div class="text-center">
+                            <h4 class="fw-bold mb-0" id="total-products">...</h4>
+                            <small class="text-muted">ทั้งหมด</small>
                         </div>
                         <div class="vr"></div>
-                        <div class="d-flex align-items-center">
-                            <div class="fs-2 text-warning me-3"><i class="bi bi-exclamation-triangle"></i></div>
-                            <div>
-                                <h4 class="fw-bold mb-0" id="low-stock">...</h4>
-                                <small class="text-muted">ใกล้หมด</small>
-                            </div>
+                        <div class="text-center">
+                            <h4 class="fw-bold mb-0 text-warning" id="low-stock">...</h4>
+                            <small class="text-muted">ใกล้หมด</small>
                         </div>
                         <div class="vr"></div>
-                        <div class="d-flex align-items-center">
-                            <div class="fs-2 text-danger me-3"><i class="bi bi-x-circle"></i></div>
-                            <div>
-                                <h4 class="fw-bold mb-0" id="out-of-stock">...</h4>
-                                <small class="text-muted">ของหมด</small>
-                            </div>
+                        <div class="text-center">
+                            <h4 class="fw-bold mb-0 text-danger" id="out-of-stock">...</h4>
+                            <small class="text-muted">ของหมด</small>
                         </div>
+                         <div class="vr"></div>
+                        <button class="btn btn-light" onclick="openSettings()" title="ตั้งค่าระบบ">
+                            <i class="bi bi-gear-fill"></i>
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
+    </header>
+   
+    <div class="main-container">
         <div class="text-center mb-4">
-            <h4 class="fw-bold">เมนูการทำงานหลัก</h4>
+            <h3 class="fw-bold">เมนูการทำงานหลัก</h3>
             <p class="text-muted">เลือกเมนูที่ต้องการเพื่อเข้าสู่ระบบจัดการ</p>
         </div>
 
-        <div class="row row-cols-1 row-cols-md-3 g-5 mb-5">
-            <div class="col"><div class="feature-card"><div class="icon-circle c-blue"><i class="bi bi-bar-chart-line-fill"></i></div><h5>ภาพรวมคลัง</h5><p>ดูข้อมูลสินค้าในคลังทั้งหมด และจัดการสต็อกสินค้า</p><a href="<?= ScriptApp.getService().getUrl() ?>?page=stock" class="btn-link" style="background-color: #EBF2FE; color: #2775EC;" onclick="showLoader()">คลิกเพื่อเข้าใช้งาน</a></div></div>
-            <div class="col"><div class="feature-card"><div class="icon-circle c-green"><i class="bi bi-box-arrow-in-down"></i></div><h5>รับสินค้า</h5><p>บันทึกการรับสินค้าเข้าคลังจากซัพพลายเออร์</p><a href="<?= ScriptApp.getService().getUrl() ?>?page=receipt" class="btn-link" style="background-color: #E6F8F2; color: #00A971;" onclick="showLoader()">คลิกเพื่อเข้าใช้งาน</a></div></div>
-            <div class="col"><div class="feature-card"><div class="icon-circle c-purple"><i class="bi bi-box-arrow-up"></i></div><h5>เบิกสินค้า</h5><p>จัดการการเบิกสินค้าออกจากคลังไปยังสาขา</p><a href="<?= ScriptApp.getService().getUrl() ?>?page=withdrawal" class="btn-link" style="background-color: #F1F0FD; color: #6E62E5;" onclick="showLoader()">คลิกเพื่อเข้าใช้งาน</a></div></div>
-            <div class="col"><div class="feature-card"><div class="icon-circle c-yellow"><i class="bi bi-columns-gap"></i></div><h5>คัดแยกสินค้า</h5><p>จัดการการคัดแยกและจำแนกประเภทสินค้า</p><a href="<?= ScriptApp.getService().getUrl() ?>?page=sorting" class="btn-link" style="background-color: #FEF7E6; color: #F0B413;" onclick="showLoader()">คลิกเพื่อเข้าใช้งาน</a></div></div>
-            <div class="col"><div class="feature-card"><div class="icon-circle c-blue"><i class="bi bi-clipboard2-check-fill"></i></div><h5>ประวัติสุ่มเช็ค</h5><p>ติดตามและตรวจสอบผลการสุ่มเช็คคุณภาพสินค้า</p><a href="<?= ScriptApp.getService().getUrl() ?>?page=check-history" class="btn-link" style="background-color: #EBF2FE; color: #2775EC;" onclick="showLoader()">คลิกเพื่อเข้าใช้งาน</a></div></div>
-            <div class="col"><div class="feature-card"><div class="icon-circle c-red"><i class="bi bi-tools"></i></div><h5>บันทึกซ่อมบำรุง</h5><p>จัดการและติดตามประวัติการซ่อมบำรุงอุปกรณ์</p><a href="<?= ScriptApp.getService().getUrl() ?>?page=maintenance" class="btn-link" style="background-color: #FDE8E8; color: #E23838;" onclick="showLoader()">คลิกเพื่อเข้าใช้งาน</a></div></div>
-            <div class="col"><div class="feature-card"><div class="icon-circle" style="background-color: #E7F6FD; color: #0EA5E9;"><i class="bi bi-people-fill"></i></div><h5>ยอดแผงคงค้าง</h5><p>ตรวจสอบและจัดการยอดแผงไข่ที่ค้างอยู่กับซัพพลายเออร์และสาขา</p><a href="<?= ScriptApp.getService().getUrl() ?>?page=suppliers" class="btn-link" style="background-color: #E7F6FD; color: #0EA5E9;" onclick="showLoader()">คลิกเพื่อเข้าใช้งาน</a></div></div>
+        <div class="menu-grid">
+            <a href="<?= ScriptApp.getService().getUrl() ?>?page=stock" class="feature-card" onclick="showLoader()">
+                <div class="feature-card-header">
+                    <div class="icon-circle c-blue"><i class="bi bi-bar-chart-line-fill"></i></div>
+                    <h5>ภาพรวมคลัง</h5>
+                </div>
+                <p>ดูข้อมูลสินค้าในคลังทั้งหมด และจัดการสต็อกสินค้า</p>
+                <div class="feature-card-footer"><i class="bi bi-arrow-right-circle-fill text-primary arrow-icon"></i></div>
+            </a>
+             <a href="<?= ScriptApp.getService().getUrl() ?>?page=receipt" class="feature-card" onclick="showLoader()">
+                <div class="feature-card-header">
+                    <div class="icon-circle c-green"><i class="bi bi-box-arrow-in-down"></i></div>
+                    <h5>รับสินค้า</h5>
+                </div>
+                <p>บันทึกการรับสินค้าเข้าคลังจากซัพพลายเออร์</p>
+                 <div class="feature-card-footer"><i class="bi bi-arrow-right-circle-fill text-success arrow-icon"></i></div>
+            </a>
+             <a href="<?= ScriptApp.getService().getUrl() ?>?page=withdrawal" class="feature-card" onclick="showLoader()">
+                <div class="feature-card-header">
+                    <div class="icon-circle c-purple"><i class="bi bi-box-arrow-up"></i></div>
+                    <h5>เบิกสินค้า</h5>
+                </div>
+                <p>จัดการการเบิกสินค้าออกจากคลังไปยังสาขา</p>
+                 <div class="feature-card-footer"><i class="bi bi-arrow-right-circle-fill text-purple arrow-icon" style="color:#7857ff;"></i></div>
+            </a>
+             <a href="<?= ScriptApp.getService().getUrl() ?>?page=sorting" class="feature-card" onclick="showLoader()">
+                <div class="feature-card-header">
+                    <div class="icon-circle c-yellow"><i class="bi bi-columns-gap"></i></div>
+                    <h5>คัดแยกสินค้า</h5>
+                </div>
+                <p>จัดการการคัดแยกและจำแนกประเภทสินค้า</p>
+                 <div class="feature-card-footer"><i class="bi bi-arrow-right-circle-fill text-warning arrow-icon"></i></div>
+            </a>
+             <a href="<?= ScriptApp.getService().getUrl() ?>?page=check-history" class="feature-card" onclick="showLoader()">
+                <div class="feature-card-header">
+                    <div class="icon-circle c-teal"><i class="bi bi-clipboard2-check-fill"></i></div>
+                    <h5>ประวัติสุ่มเช็ค</h5>
+                </div>
+                <p>ติดตามและตรวจสอบผลการสุ่มเช็คคุณภาพสินค้า</p>
+                 <div class="feature-card-footer"><i class="bi bi-arrow-right-circle-fill arrow-icon" style="color:#009688;"></i></div>
+            </a>
+             <a href="<?= ScriptApp.getService().getUrl() ?>?page=maintenance" class="feature-card" onclick="showLoader()">
+                <div class="feature-card-header">
+                    <div class="icon-circle c-red"><i class="bi bi-tools"></i></div>
+                    <h5>บันทึกซ่อมบำรุง</h5>
+                </div>
+                <p>จัดการและติดตามประวัติการซ่อมบำรุงอุปกรณ์</p>
+                 <div class="feature-card-footer"><i class="bi bi-arrow-right-circle-fill text-danger arrow-icon"></i></div>
+            </a>
+            <a href="<?= ScriptApp.getService().getUrl() ?>?page=suppliers" class="feature-card" onclick="showLoader()">
+                <div class="feature-card-header">
+                    <div class="icon-circle c-sky"><i class="bi bi-people-fill"></i></div>
+                    <h5>ยอดแผงคงค้าง</h5>
+                </div>
+                <p>ตรวจสอบและจัดการยอดแผงไข่คงค้าง</p>
+                 <div class="feature-card-footer"><i class="bi bi-arrow-right-circle-fill arrow-icon" style="color:#03a9f4;"></i></div>
+            </a>
         </div>
     </div>
     
-<div class="modal fade" id="settings-modal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <form id="settings-form">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-gear-fill me-2"></i>การตั้งค่าระบบ</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="alert alert-info d-flex align-items-center" role="alert">
-                       <i class="bi bi-info-circle-fill me-2"></i>
-                       <div>
-                           ข้อมูลส่วนนี้จะถูกนำไปใช้ในหัวกระดาษของเอกสารต่างๆ ที่พิมพ์จากระบบ
-                       </div>
+    <div class="modal fade" id="settings-modal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form id="settings-form">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-gear-fill me-2"></i>การตั้งค่าระบบ</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <h6 class="mt-4">ข้อมูลบริษัท</h6>
-                    <div class="row g-3">
-                        <div class="col-md-12">
-                            <label for="setting-companyName" class="form-label">ชื่อบริษัท/ร้านค้า</label>
-                            <input type="text" class="form-control" id="setting-companyName">
+                    <div class="modal-body">
+                        <div class="alert alert-info d-flex align-items-center" role="alert">
+                           <i class="bi bi-info-circle-fill me-2"></i>
+                           <div>
+                               ข้อมูลส่วนนี้จะถูกนำไปใช้ในหัวกระดาษของเอกสารต่างๆ ที่พิมพ์จากระบบ
+                           </div>
                         </div>
-                        <div class="col-md-6">
-                            <label for="setting-address1" class="form-label">ที่อยู่บรรทัดที่ 1</label>
-                            <input type="text" class="form-control" id="setting-address1">
+                        <h6 class="mt-4">ข้อมูลบริษัท</h6>
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label for="setting-companyName" class="form-label">ชื่อบริษัท/ร้านค้า</label>
+                                <input type="text" class="form-control" id="setting-companyName">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="setting-address1" class="form-label">ที่อยู่บรรทัดที่ 1</label>
+                                <input type="text" class="form-control" id="setting-address1">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="setting-address2" class="form-label">ที่อยู่บรรทัดที่ 2</label>
+                                <input type="text" class="form-control" id="setting-address2">
+                            </div>
+                             <div class="col-md-12">
+                                <label for="setting-contactInfo" class="form-label">ข้อมูลติดต่อ (เบอร์โทร, อีเมล)</label>
+                                <input type="text" class="form-control" id="setting-contactInfo">
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label for="setting-address2" class="form-label">ที่อยู่บรรทัดที่ 2</label>
-                            <input type="text" class="form-control" id="setting-address2">
-                        </div>
-                         <div class="col-md-12">
-                            <label for="setting-contactInfo" class="form-label">ข้อมูลติดต่อ (เบอร์โทร, อีเมล)</label>
-                            <input type="text" class="form-control" id="setting-contactInfo">
-                        </div>
-                    </div>
-                    <hr>
-                    <h6>การตั้งค่าคลังสินค้า</h6>
-                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <label for="setting-low-stock" class="form-label">แจ้งเตือนเมื่อสต็อกต่ำกว่า (Low Stock Threshold)</label>
-                            <input type="number" class="form-control" id="setting-low-stock" min="0">
-                        </div>
-                     </div>
-                     <hr>
-                     <h6>การจัดการ Cache</h6>
-                     <p class="text-muted small">หากมีการแก้ไขข้อมูลใน Dropdown (เช่น รายชื่อพนักงาน, สินค้า) แล้วไม่แสดงผลในฟอร์ม ให้ทำการล้าง Cache เพื่อให้ระบบดึงข้อมูลใหม่ทั้งหมด</p>
-                     <button type="button" class="btn btn-outline-danger" onclick="handleClearCache()">
-                        <i class="bi bi-trash3-fill me-1"></i> ล้าง Cache ฝั่งเซิร์ฟเวอร์
-                     </button>
+                        <hr>
+                        <h6>การตั้งค่าคลังสินค้า</h6>
+                         <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="setting-low-stock" class="form-label">แจ้งเตือนเมื่อสต็อกต่ำกว่า (Low Stock Threshold)</label>
+                                <input type="number" class="form-control" id="setting-low-stock" min="0">
+                            </div>
+                         </div>
+                         <hr>
+                         <h6>การจัดการ Cache</h6>
+                         <p class="text-muted small">หากมีการแก้ไขข้อมูลใน Dropdown (เช่น รายชื่อพนักงาน, สินค้า) แล้วไม่แสดงผลในฟอร์ม ให้ทำการล้าง Cache เพื่อให้ระบบดึงข้อมูลใหม่ทั้งหมด</p>
+                         <button type="button" class="btn btn-outline-danger" onclick="handleClearCache()">
+                            <i class="bi bi-trash3-fill me-1"></i> ล้าง Cache ฝั่งเซิร์ฟเวอร์
+                         </button>
 
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary">บันทึกการตั้งค่า</button>
-                </div>
-            </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+                        <button type="submit" class="btn btn-primary">บันทึกการตั้งค่า</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-</div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <?!= include('Dashboard-JS'); ?>
