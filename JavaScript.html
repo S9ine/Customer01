@@ -467,45 +467,32 @@ function deleteReceiptRecord(docId) {
 function handleSortingSubmit(e) { 
     e.preventDefault(); 
     sortSubmitBtn.disabled = true; 
-    
     const selectedSourceItems = document.querySelectorAll('input.source-item-checkbox:checked');
     if (selectedSourceItems.length === 0) {
         showToast("กรุณาเลือกรายการสินค้าต้นทางอย่างน้อย 1 รายการ", "warning");
-        sortSubmitBtn.disabled = false;
-        return;
+        sortSubmitBtn.disabled = false; return;
     }
-
     const sourceQty = parseFloat(document.getElementById("sort-sourceQty").value); 
     let totalSortedQty = 0; 
-    const sortedItems = Array.from(sortingItemTableBody.rows).map(r => { 
+    const sortedItems = Array.from(document.getElementById("sortingItemTableBody").rows).map(r => { 
         const qty = parseFloat(r.querySelector('[name="quantity"]').value); 
         if (!isNaN(qty)) totalSortedQty += qty;
         return { name: r.querySelector('[name="itemName"]').value, quantity: qty, unit: r.querySelector('[name="unit"]').value } 
     }).filter(i => i.name && i.quantity > 0); 
-
     if (sortedItems.length === 0) { 
         showToast("กรุณากรอกรายการคัดแยก", "warning"); 
-        sortSubmitBtn.disabled = false; 
-        return; 
+        sortSubmitBtn.disabled = false; return;
     } 
-    
     if (Math.abs(totalSortedQty - sourceQty) > 0.001 && !confirm(`จำนวนไม่ตรงกัน! ต้นทาง: ${sourceQty}, คัดแยกได้: ${totalSortedQty}\nคุณต้องการบันทึกต่อหรือไม่?`)) { 
-        sortSubmitBtn.disabled = false; 
-        return; 
+        sortSubmitBtn.disabled = false; return;
     } 
-
     const selectedIds = Array.from(selectedSourceItems).map(cb => cb.value).join(',');
-
     const docId = document.getElementById("sort-docId").value; 
     const formData = { 
-        docId: docId, 
-        refDocId: document.getElementById("sort-refDocId").value, 
+        docId: docId, refDocId: document.getElementById("sort-refDocId").value, 
         sourceItem: document.getElementById("sort-sourceItem").value, 
-        sourceQty: sourceQty, 
-        sortedItems: sortedItems,
-        sourceLineItemId: selectedIds
+        sourceQty: sourceQty, sortedItems: sortedItems, sourceLineItemId: selectedIds
     }; 
-    
     const serverFunc = docId ? 'updateSortingDataFromWebApp' : 'saveSortingDataFromWebApp'; 
     showLoader(); 
     google.script.run.withSuccessHandler(res => { 
@@ -521,20 +508,14 @@ function updateSortingSourceFromSelection() {
     const sourceInfo = document.getElementById("source-info");
     const sourceItemInput = document.getElementById("sort-sourceItem");
     const sourceQtyInput = document.getElementById("sort-sourceQty");
-
     if (selectedCheckboxes.length > 0) {
         let totalQty = 0;
         const itemNames = [];
-        
         selectedCheckboxes.forEach(cb => {
-            const qty = parseFloat(cb.dataset.quantity) || 0;
-            totalQty += qty;
+            totalQty += parseFloat(cb.dataset.quantity) || 0;
             itemNames.push(cb.dataset.name);
         });
-        
-        const uniqueItemNames = [...new Set(itemNames)];
-        
-        sourceItemInput.value = uniqueItemNames.join(', ');
+        sourceItemInput.value = [...new Set(itemNames)].join(', ');
         sourceQtyInput.value = totalQty;
         sourceInfo.style.display = "block";
     } else {
@@ -546,34 +527,24 @@ function updateSortingSourceFromSelection() {
 
 function fetchDataForSorting() {
     const refDocId = document.getElementById("sort-refDocId").value;
-    if (!refDocId) {
-        showToast("กรุณากรอกเลขเอกสาร GRN", "warning");
-        return;
-    }
-
+    if (!refDocId) { showToast("กรุณากรอกเลขเอกสาร GRN", "warning"); return; }
     const fetchBtn = document.getElementById("fetch-btn");
     const selectionArea = document.getElementById("item-selection-area");
     const sourceInfo = document.getElementById("source-info");
-    
     fetchBtn.disabled = true;
     selectionArea.innerHTML = '<div class="text-center text-muted">กำลังดึงข้อมูล...</div>';
     sourceInfo.style.display = "none";
     showLoader();
-
     google.script.run
         .withSuccessHandler(response => {
             hideLoader();
             fetchBtn.disabled = false;
-
             if (response.success) {
                 selectionArea.innerHTML = '<h6>เลือกรายการที่ต้องการคัดแยก (เลือกได้หลายรายการ):</h6>';
-                const items = response.data;
-
-                items.forEach((item, index) => {
+                response.data.forEach((item, index) => {
                     const cbWrapper = document.createElement('div');
                     cbWrapper.className = 'form-check mb-2';
                     const cbId = `source-item-${index}`;
-                    
                     cbWrapper.innerHTML = `
                         <input class="form-check-input source-item-checkbox" type="checkbox" id="${cbId}" 
                                value="${item.lineItemId}" 
@@ -582,17 +553,11 @@ function fetchDataForSorting() {
                         <label class="form-check-label" for="${cbId}">
                             ${item.itemName} 
                             <span class="badge bg-primary rounded-pill">${item.remainingQty.toLocaleString('th-TH')}</span>
-                        </label>
-                    `;
-
-                    const checkboxInput = cbWrapper.querySelector('input');
-                    checkboxInput.addEventListener('change', updateSortingSourceFromSelection);
-                    
+                        </label>`;
+                    cbWrapper.querySelector('input').addEventListener('change', updateSortingSourceFromSelection);
                     selectionArea.appendChild(cbWrapper);
                 });
-                
                 showToast("ดึงข้อมูลสำเร็จ", "success");
-
             } else {
                 selectionArea.innerHTML = '';
                 showToast(response.message, "danger");
