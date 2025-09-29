@@ -1227,36 +1227,67 @@ function getWithdrawalData(page = 1, rowsPerPage = 10, searchTerm = "") {
  */
 function fetchReceiptForSortingWebApp(grn_id) {
     try {
-        if (!grn_id) {
-            throw new Error("กรุณาป้อนเลขเอกสารรับเข้า (GRN)");
-        }
-        
-        const receiptDataSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.receiptData.dataSheetName);
-        const allReceiptData = receiptDataSheet.getRange(2, 1, receiptDataSheet.getLastRow() - 1, 6).getValues(); // A:F
-        
-        // 1. กรองหาทุกแถวที่ตรงกับ GRN
-        const foundRecords = allReceiptData.filter(row => row[0].toString().trim() === grn_id.toString().trim());
-        
-        if (foundRecords.length === 0) {
+        if (!grn_id) throw new Error("กรุณาป้อนเลขเอกสารรับเข้า (GRN)");
+
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const receiptSheet = ss.getSheetByName(CONFIG.receiptData.dataSheetName);
+        const sortingSheet = ss.getSheetByName(CONFIG.sortingData.dataSheetName);
+
+        // 1. ดึงข้อมูลทั้งหมดจากใบรับเข้า (GRN)
+        const receiptData = receiptSheet.getRange(2, 1, receiptSheet.getLastRow() - 1, 6).getValues(); // A:F
+        const grnItems = receiptData
+            .map((row, index) => ({
+                row: index + 2, // +2 for 1-based index and header row
+                docId: row[0],
+                itemName: row[4],
+                quantity: Number(row[5]) || 0,
+            }))
+            .filter(item => item.docId.toString().trim() === grn_id.toString().trim());
+
+        if (grnItems.length === 0) {
             throw new Error(`ไม่พบข้อมูลสำหรับเอกสารเลขที่ ${grn_id}`);
         }
         
-        // 2. แปลงข้อมูลเป็น Array ของ Object (เหมือนเดิม)
-        const items = foundRecords.map(record => ({
-            itemName: record[4],
-            quantity: Number(record[5]) || 0
-        }));
+        // สร้าง Unique ID ให้กับสินค้าแต่ละบรรทัดใน GRN
+        grnItems.forEach(item => {
+            item.lineItemId = `${item.docId}|${item.itemName}|${item.row}`;
+        });
 
-        // 3. ***ส่วนที่เพิ่มเข้ามา: คำนวณยอดรวม***
-        // (สมมติว่าสินค้าใน GRN ที่จะคัดแยกเป็นชนิดเดียวกันทั้งหมด)
-        const totalQuantity = items.reduce((sum, currentItem) => sum + currentItem.quantity, 0);
-        const summary = {
-            itemName: items[0].itemName, // ใช้ชื่อสินค้าจากรายการแรก
-            totalQuantity: totalQuantity
-        };
+        // 2. ดึงข้อมูลการคัดแยกทั้งหมดที่อ้างอิง GRN นี้ เพื่อหายอดที่ "ใช้ไปแล้ว"
+        const sortedQuantities = new Map();
+        if (sortingSheet && sortingSheet.getLastRow() > 1) {
+            // เพิ่มคอลัมน์ "ID สินค้าต้นทาง" (Source Line Item ID) เข้ามาที่คอลัมน์ I (index 8)
+            const sortingData = sortingSheet.getRange(2, 1, sortingSheet.getLastRow() - 1, 9).getValues();
+            sortingData.forEach(row => {
+                const refDocId = row[2];
+                // ID สามารถมีได้หลายค่า คั่นด้วยจุลภาค
+                const sourceLineIds = row[8] ? row[8].toString().split(',') : [];
+                const sortedQty = Number(row[4]) || 0;
 
-        // 4. ส่งข้อมูลกลับในรูปแบบใหม่ที่มีทั้ง summary และ items
-        return { success: true, data: { summary: summary, items: items } };
+                if (refDocId === grn_id && sourceLineIds.length > 0) {
+                    // ในกรณีที่บันทึกแบบรวมยอด, เราจะนับยอดที่ใช้ไปแค่ครั้งเดียวโดยอิงจาก ID แรก
+                    const representativeId = sourceLineIds[0].trim();
+                     if (representativeId) {
+                       sortedQuantities.set(representativeId, (sortedQuantities.get(representativeId) || 0) + sortedQty);
+                     }
+                }
+            });
+        }
+        
+        // 3. คำนวณยอด "คงเหลือ" ที่สามารถคัดแยกได้
+        const availableItems = grnItems.map(item => {
+            const usedQty = sortedQuantities.get(item.lineItemId) || 0;
+            return {
+                ...item,
+                remainingQty: item.quantity - usedQty,
+            };
+        }).filter(item => item.remainingQty > 0); // กรองเอารายการที่ยังเหลือให้คัดแยกเท่านั้น
+
+        if (availableItems.length === 0) {
+          throw new Error(`สินค้าทั้งหมดในเอกสาร ${grn_id} ถูกคัดแยกไปหมดแล้ว`);
+        }
+
+        return { success: true, data: availableItems };
 
     } catch (e) {
         return { success: false, message: e.message };
@@ -1314,70 +1345,93 @@ function getSortingHistory(page = 1, rowsPerPage = 10, searchTerm = "") {
 
 function saveSortingDataFromWebApp(formData) {
   try {
+    // --- Server-side Validation ---
+    const availableItemsResponse = fetchReceiptForSortingWebApp(formData.refDocId);
+    if (!availableItemsResponse.success) {
+      throw new Error(availableItemsResponse.message);
+    }
+    const availableItemsData = availableItemsResponse.data;
+
+    const selectedLineItemIds = formData.sourceLineItemId.split(',');
+    let totalAvailableQty = 0;
+    const itemsToDeductFromStock = [];
+
+    selectedLineItemIds.forEach(id => {
+      const targetItem = availableItemsData.find(item => item.lineItemId === id.trim());
+      if (!targetItem) {
+        throw new Error(`ไม่พบรายการสินค้าที่เลือก (ID: ${id}) หรืออาจถูกคัดแยกไปแล้ว`);
+      }
+      totalAvailableQty += targetItem.remainingQty;
+      itemsToDeductFromStock.push({ name: targetItem.itemName, quantity: targetItem.remainingQty });
+    });
+    
+    if (Math.abs(Number(formData.sourceQty) - totalAvailableQty) > 0.001) {
+       throw new Error(`จำนวนสินค้าต้นทางไม่ตรงกัน! ยอดที่ส่งมา: ${formData.sourceQty}, ยอดที่ควรจะเป็น: ${totalAvailableQty}`);
+    }
+    // --- End Validation ---
+
     const dataSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sortingData.dataSheetName);
     const currentUser = Session.getActiveUser().getEmail() || 'Unknown User';
     const timestamp = new Date();
     const docId = generateDocId_('SORT', CONFIG.sortingData.dataSheetName);
 
     if (dataSheet.getLastRow() === 0) {
-      const headers = [['เลขเอกสารคัดแยก', 'วันที่คัดแยก', 'เอกสารรับเข้าอ้างอิง', 'สินค้าต้นทาง', 'จำนวนต้นทาง', 'สินค้าคัดแยก', 'จำนวนที่ได้', 'ผู้บันทึก']];
+      const headers = [['เลขเอกสารคัดแยก', 'วันที่คัดแยก', 'เอกสารรับเข้าอ้างอิง', 'สินค้าต้นทาง', 'จำนวนต้นทาง', 'สินค้าคัดแยก', 'จำนวนที่ได้', 'ผู้บันทึก', 'ID สินค้าต้นทาง']];
       dataSheet.getRange(1, 1, 1, headers[0].length).setValues(headers);
     }
 
+    const sourceItemDisplayName = [...new Set(itemsToDeductFromStock.map(i => i.name))].join(', ');
+
     const recordsToSave = formData.sortedItems.map(item => [
-      docId, timestamp, formData.refDocId, 
-      formData.sourceItem, formData.sourceQty, 
-      item.name, item.quantity, currentUser
+      docId, timestamp, formData.refDocId,
+      sourceItemDisplayName, formData.sourceQty,
+      item.name, item.quantity, currentUser, formData.sourceLineItemId
     ]);
 
     if (recordsToSave.length > 0) {
       dataSheet.getRange(dataSheet.getLastRow() + 1, 1, recordsToSave.length, recordsToSave[0].length).setValues(recordsToSave);
       
-      // [แก้] บันทึก Log
       logActivity_({
           action: 'สร้าง',
           target: 'เอกสารคัดแยก',
           docId: docId,
-          details: {
-              refDocId: formData.refDocId,
-              sourceItem: formData.sourceItem
-          }
+          details: { refDocId: formData.refDocId, sourceItem: sourceItemDisplayName }
       });
       
       const productList = getProductList();
-      const itemsToUpdate = [];
+      const itemsToUpdateInStockSheet = [];
 
-      const sourceProduct = productList.find(p => p.name === formData.sourceItem);
-      if (sourceProduct) {
-        itemsToUpdate.push({ id: sourceProduct.id, quantityChange: -Math.abs(Number(formData.sourceQty)) });
-      } else { console.warn(`[Sorting] ไม่พบรหัสสินค้าสำหรับ '${formData.sourceItem}' จึงไม่ได้ลดสต็อก`); }
+      // **ส่วนที่แก้ไข:** วนลูปเพื่อหักสต็อกของสินค้าต้นทาง *แต่ละรายการ*
+      itemsToDeductFromStock.forEach(itemToDeduct => {
+          const product = productList.find(p => p.name === itemToDeduct.name);
+          if (product) {
+              itemsToUpdateInStockSheet.push({ id: product.id, quantityChange: -Math.abs(Number(itemToDeduct.quantity)) });
+          }
+      });
 
+      // เพิ่มสต็อกของสินค้าที่คัดแยกได้
       formData.sortedItems.forEach(item => {
         const sortedProduct = productList.find(p => p.name === item.name);
         if (sortedProduct) {
-          itemsToUpdate.push({ id: sortedProduct.id, quantityChange: Math.abs(Number(item.quantity)) });
-        } else { console.warn(`[Sorting] ไม่พบรหัสสินค้าสำหรับ '${item.name}' จึงไม่ได้เพิ่มสต็อก`); }
+          itemsToUpdateInStockSheet.push({ id: sortedProduct.id, quantityChange: Math.abs(Number(item.quantity)) });
+        }
       });
-      
-      if(itemsToUpdate.length > 0){
-        updateStockLevels_(itemsToUpdate);
+
+      if(itemsToUpdateInStockSheet.length > 0){
+        updateStockLevels_(itemsToUpdateInStockSheet);
       }
       
       clearServerCache();
       return { success: true, docId: docId };
-
-    } else { 
-      throw new Error("ไม่พบรายการสินค้าคัดแยกที่จะบันทึก"); 
+    } else {
+      throw new Error("ไม่พบรายการสินค้าคัดแยกที่จะบันทึก");
     }
-  } catch (e) { 
+  } catch (e) {
     console.error("saveSortingDataFromWebApp Error: " + e.toString());
-    return { success: false, message: e.message }; 
+    return { success: false, message: e.message };
   }
 }
 
-/**
- * [CRITICAL BUG FIX] UPDATE: อัปเดตข้อมูลการคัดแยก พร้อมคืนสต็อกเก่าและตัดสต็อกใหม่
- */
 function updateSortingDataFromWebApp(formData) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
