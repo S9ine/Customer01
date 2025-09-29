@@ -807,6 +807,14 @@ function deleteReceiptRecord(docId) {
 function handleSortingSubmit(e) { 
     e.preventDefault(); 
     sortSubmitBtn.disabled = true; 
+    
+    const selectedSourceItems = document.querySelectorAll('input.source-item-checkbox:checked');
+    if (selectedSourceItems.length === 0) {
+        showToast("กรุณาเลือกรายการสินค้าต้นทางอย่างน้อย 1 รายการ", "warning");
+        sortSubmitBtn.disabled = false;
+        return;
+    }
+
     const sourceQty = parseFloat(document.getElementById("sort-sourceQty").value); 
     let totalSortedQty = 0; 
     const sortedItems = Array.from(sortingItemTableBody.rows).map(r => { 
@@ -820,18 +828,24 @@ function handleSortingSubmit(e) {
         sortSubmitBtn.disabled = false; 
         return; 
     } 
-    if (totalSortedQty !== sourceQty && !confirm(`จำนวนไม่ตรงกัน! ต้นทาง: ${sourceQty}, คัดแยกได้: ${totalSortedQty}\nคุณต้องการบันทึกต่อหรือไม่?`)) { 
+    
+    if (Math.abs(totalSortedQty - sourceQty) > 0.001 && !confirm(`จำนวนไม่ตรงกัน! ต้นทาง: ${sourceQty}, คัดแยกได้: ${totalSortedQty}\nคุณต้องการบันทึกต่อหรือไม่?`)) { 
         sortSubmitBtn.disabled = false; 
         return; 
     } 
+
+    const selectedIds = Array.from(selectedSourceItems).map(cb => cb.value).join(',');
+
     const docId = document.getElementById("sort-docId").value; 
     const formData = { 
         docId: docId, 
         refDocId: document.getElementById("sort-refDocId").value, 
         sourceItem: document.getElementById("sort-sourceItem").value, 
         sourceQty: sourceQty, 
-        sortedItems: sortedItems 
+        sortedItems: sortedItems,
+        sourceLineItemId: selectedIds
     }; 
+    
     const serverFunc = docId ? 'updateSortingDataFromWebApp' : 'saveSortingDataFromWebApp'; 
     showLoader(); 
     google.script.run.withSuccessHandler(res => { 
@@ -839,6 +853,97 @@ function handleSortingSubmit(e) {
         if (res.success) sortingModal.hide();
         onSaveSuccess(res, "sorting"); 
     }).withFailureHandler(onFailure)[serverFunc](formData); 
+}
+
+
+function updateSortingSourceFromSelection() {
+    const selectedCheckboxes = document.querySelectorAll('input.source-item-checkbox:checked');
+    const sourceInfo = document.getElementById("source-info");
+    const sourceItemInput = document.getElementById("sort-sourceItem");
+    const sourceQtyInput = document.getElementById("sort-sourceQty");
+
+    if (selectedCheckboxes.length > 0) {
+        let totalQty = 0;
+        const itemNames = [];
+        
+        selectedCheckboxes.forEach(cb => {
+            const qty = parseFloat(cb.dataset.quantity) || 0;
+            totalQty += qty;
+            itemNames.push(cb.dataset.name);
+        });
+        
+        const uniqueItemNames = [...new Set(itemNames)];
+        
+        sourceItemInput.value = uniqueItemNames.join(', ');
+        sourceQtyInput.value = totalQty;
+        sourceInfo.style.display = "block";
+    } else {
+        sourceInfo.style.display = "none";
+        sourceItemInput.value = "";
+        sourceQtyInput.value = "";
+    }
+}
+
+function fetchDataForSorting() {
+    const refDocId = document.getElementById("sort-refDocId").value;
+    if (!refDocId) {
+        showToast("กรุณากรอกเลขเอกสาร GRN", "warning");
+        return;
+    }
+
+    const fetchBtn = document.getElementById("fetch-btn");
+    const selectionArea = document.getElementById("item-selection-area");
+    const sourceInfo = document.getElementById("source-info");
+    
+    fetchBtn.disabled = true;
+    selectionArea.innerHTML = '<div class="text-center text-muted">กำลังดึงข้อมูล...</div>';
+    sourceInfo.style.display = "none";
+    showLoader();
+
+    google.script.run
+        .withSuccessHandler(response => {
+            hideLoader();
+            fetchBtn.disabled = false;
+
+            if (response.success) {
+                selectionArea.innerHTML = '<h6>เลือกรายการที่ต้องการคัดแยก (เลือกได้หลายรายการ):</h6>';
+                const items = response.data;
+
+                items.forEach((item, index) => {
+                    const cbWrapper = document.createElement('div');
+                    cbWrapper.className = 'form-check mb-2';
+                    const cbId = `source-item-${index}`;
+                    
+                    cbWrapper.innerHTML = `
+                        <input class="form-check-input source-item-checkbox" type="checkbox" id="${cbId}" 
+                               value="${item.lineItemId}" 
+                               data-name="${item.itemName}" 
+                               data-quantity="${item.remainingQty}">
+                        <label class="form-check-label" for="${cbId}">
+                            ${item.itemName} 
+                            <span class="badge bg-primary rounded-pill">${item.remainingQty.toLocaleString('th-TH')}</span>
+                        </label>
+                    `;
+
+                    const checkboxInput = cbWrapper.querySelector('input');
+                    checkboxInput.addEventListener('change', updateSortingSourceFromSelection);
+                    
+                    selectionArea.appendChild(cbWrapper);
+                });
+                
+                showToast("ดึงข้อมูลสำเร็จ", "success");
+
+            } else {
+                selectionArea.innerHTML = '';
+                showToast(response.message, "danger");
+            }
+        })
+        .withFailureHandler(error => {
+            fetchBtn.disabled = false;
+            selectionArea.innerHTML = '';
+            onFailure(error);
+        })
+        .fetchReceiptForSortingWebApp(refDocId);
 }
 
 function openSortingModal() {
@@ -877,7 +982,12 @@ function fetchDataForSorting() {
     }
 
     const fetchBtn = document.getElementById("fetch-btn");
+    const selectionArea = document.getElementById("item-selection-area");
+    const sourceInfo = document.getElementById("source-info");
+    
     fetchBtn.disabled = true;
+    selectionArea.innerHTML = '<div class="text-center text-muted">กำลังดึงข้อมูล...</div>';
+    sourceInfo.style.display = "none";
     showLoader();
 
     google.script.run
@@ -886,54 +996,49 @@ function fetchDataForSorting() {
             fetchBtn.disabled = false;
 
             if (response.success) {
-                const selectionArea = document.getElementById("item-selection-area");
-                selectionArea.innerHTML = ""; // ล้างตัวเลือกเก่าทุกครั้ง
-                
-                // --- ส่วนที่แก้ไข ---
-                const summary = response.data.summary;
-                const items = response.data.items;
+                selectionArea.innerHTML = '<h6>เลือกรายการที่ต้องการคัดแยก:</h6>';
+                const items = response.data;
 
-                // 1. แสดงยอดรวมในฟอร์มเป็นค่าเริ่มต้น
-                document.getElementById("sort-sourceItem").value = summary.itemName;
-                document.getElementById("sort-sourceQty").value = summary.totalQuantity;
-                document.getElementById("source-info").style.display = "block";
-
-                // 2. ถ้ามีรายการย่อยมากกว่า 1 รายการ ให้สร้างปุ่มตัวเลือก
-                if (items.length > 1) {
-                    selectionArea.innerHTML = '<h6>หรือเลือกคัดแยกจากรายการย่อย:</h6>';
+                // --- ส่วนที่แก้ไข: สร้าง Radio Button แทนปุ่ม ---
+                items.forEach((item, index) => {
+                    const radioWrapper = document.createElement('div');
+                    radioWrapper.className = 'form-check mb-2';
                     
-                    // เพิ่มปุ่ม "ใช้ยอดรวม" เพื่อให้กลับมาเลือกยอดรวมได้
-                    const totalButton = document.createElement('button');
-                    totalButton.type = 'button';
-                    totalButton.className = 'btn btn-primary btn-sm me-2 mb-2'; // ทำให้เด่นกว่า
-                    totalButton.textContent = `ใช้ยอดรวมทั้งหมด (${summary.totalQuantity.toLocaleString('th-TH')})`;
-                    totalButton.onclick = () => {
-                        document.getElementById("sort-sourceQty").value = summary.totalQuantity;
-                    };
-                    selectionArea.appendChild(totalButton);
+                    const radioId = `source-item-${index}`;
+                    
+                    radioWrapper.innerHTML = `
+                        <input class="form-check-input" type="radio" name="source-item-radio" id="${radioId}" value="${item.lineItemId}">
+                        <label class="form-check-label" for="${radioId}">
+                            ${item.itemName} 
+                            <span class="badge bg-primary rounded-pill">${item.remainingQty.toLocaleString('th-TH')}</span>
+                        </label>
+                    `;
 
-                    // สร้างปุ่มสำหรับแต่ละรายการย่อย
-                    items.forEach(item => {
-                        const button = document.createElement('button');
-                        button.type = 'button';
-                        button.className = 'btn btn-outline-secondary btn-sm me-2 mb-2';
-                        button.textContent = `${item.itemName} (${item.quantity.toLocaleString('th-TH')})`;
-                        
-                        button.onclick = () => {
-                            // เมื่อคลิกเลือกรายการย่อย ให้ "เปลี่ยน" ตัวเลขในฟอร์ม
-                            document.getElementById("sort-sourceQty").value = item.quantity;
-                        };
-                        selectionArea.appendChild(button);
+                    const radioInput = radioWrapper.querySelector('input');
+                    // เมื่อ user เลือกรายการ ให้ update ฟอร์มด้านล่าง
+                    radioInput.addEventListener('change', () => {
+                        if (radioInput.checked) {
+                            sourceInfo.style.display = "block";
+                            document.getElementById("sort-sourceItem").value = item.itemName;
+                            document.getElementById("sort-sourceQty").value = item.remainingQty;
+                        }
                     });
-                }
+                    
+                    selectionArea.appendChild(radioWrapper);
+                });
                 
                 showToast("ดึงข้อมูลสำเร็จ", "success");
 
             } else {
+                selectionArea.innerHTML = ''; // ล้างข้อความ "กำลังดึงข้อมูล" ออก
                 showToast(response.message, "danger");
             }
         })
-        .withFailureHandler(onFailure)
+        .withFailureHandler(error => {
+            fetchBtn.disabled = false;
+            selectionArea.innerHTML = '';
+            onFailure(error);
+        })
         .fetchReceiptForSortingWebApp(refDocId);
 }
 
@@ -1225,23 +1330,38 @@ function hideLoader() { document.getElementById('loading-overlay').style.display
 function showToast(message, level = 'success') { const container = document.getElementById('toast-container'); const toast = document.createElement('div'); toast.className = `toast-notification toast-${level}`; toast.textContent = message; container.appendChild(toast); setTimeout(() => { toast.classList.add('show'); }, 100); setTimeout(() => { toast.classList.remove('show'); toast.addEventListener('transitionend', () => toast.remove()); }, 4000); }
 function deleteItemRow(btn) { if (btn.closest("tbody").rows.length > 1) { btn.closest("tr").remove(); } else { showToast("ต้องมีรายการสินค้าอย่างน้อย 1 รายการ", "warning"); } }
 
-function onSaveSuccess(response, type) { 
-    const btnMap = { 
-        withdrawal: wdSubmitBtn, 
-        receipt: rcSubmitBtn, 
-        sorting: sortSubmitBtn 
+function onSaveSuccess(response, type) {
+    const btnMap = {
+        withdrawal: wdSubmitBtn,
+        receipt: rcSubmitBtn,
+        sorting: sortSubmitBtn
     };
     const btn = btnMap[type];
 
-    if (response.success) { 
-        showToast(`บันทึกสำเร็จ! เลขเอกสาร: ${response.docId}`, "success"); 
-        if (type === 'withdrawal') { resetWithdrawalForm(); loadWithdrawalPage(1); } 
-        else if (type === 'receipt') { resetReceiptForm(); loadReceiptPageData(); } 
-        else if (type === 'sorting') { resetSortingForm(); loadSortingHistory(); } 
-    } else { 
-        showToast(response.message, "danger"); 
-    } 
-    if (btn) btn.disabled = false; 
+    if (response.success) {
+        showToast(`บันทึกสำเร็จ! เลขเอกสาร: ${response.docId}`, "success");
+
+        // --- จุดที่ต้องแก้ไข ---
+        if (type === 'withdrawal') {
+            resetWithdrawalForm();
+            loadWithdrawalPage(1);
+            loadSupplierDashboard(); // <-- เพิ่มบรรทัดนี้
+        }
+        else if (type === 'receipt') {
+            resetReceiptForm();
+            loadReceiptPageData();
+            loadSupplierDashboard(); // <-- เพิ่มบรรทัดนี้
+        }
+        else if (type === 'sorting') {
+            resetSortingForm();
+            loadSortingHistory();
+        }
+        // --- สิ้นสุดจุดที่ต้องแก้ไข ---
+
+    } else {
+        showToast(response.message, "danger");
+    }
+    if (btn) btn.disabled = false;
 }
 
 function onFailure(error) { 
