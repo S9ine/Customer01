@@ -263,7 +263,7 @@ window.addEventListener('load', () => {
         document.querySelector('.nav-link[data-tab="stock"]').click();
     }
 
-    const pagesWithForms = ['receipt', 'withdrawal', 'sorting'];
+const pagesWithForms = ['receipt', 'withdrawal', 'sorting', 'suppliers']; // <-- เพิ่ม 'suppliers' ในบรรทัดนี้
     if (pagesWithForms.includes(pageToLoad)) {
         loadAllOptions();
         addWithdrawalItemRow();
