@@ -240,10 +240,6 @@ body {
 .toast-notification.toast-danger { background-color: #dc3545; }
 .toast-notification.toast-warning { background-color: #ffc107; color: #333; }
 
-#loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 10000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
-.spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
 .tab-content-area {
   background-color: #fff; /* ทำให้พื้นที่เนื้อหาหลักทั้งหมดเป็นสีขาว */
   border: 1px solid var(--border-color);
@@ -289,7 +285,7 @@ body {
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-    .table-loader {
+.table-loader {
         position: absolute;
         top: 0;
         left: 0;
@@ -317,6 +313,8 @@ body {
 /* =================================================== */
 /* === [NEW] Egg Loader Styles ===================== */
 /* =================================================== */
+#loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 10000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
+
 .loading {
     display: none; position: fixed;
     top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;
